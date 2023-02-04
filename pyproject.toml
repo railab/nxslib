@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools >= 61.2"]
+build-backend = 'setuptools.build_meta'
+
+[project]
+name = "nxslib"
+version = "0.1.0"
+authors = [{name = "raiden00", email = "raiden00@railab.me"}]
+description = "NxScope client library"
+license = {file = "LICENSE"}
+requires-python = ">=3.10"
+classifiers = ["License :: OSI Approved :: Apache Software License"]
+dependencies = [
+         "pyserial>=3.5",
+         "crcmod>=1.7",
+         "matplotlib>=3.6",
+         "pypubsub>4.0",
+         "click>=8.1"
+]
+
+[tool.black]
+line-length = 79
+target-version = ['py310']
+
+[tool.isort]
+profile = "black"
+line_length = 79
