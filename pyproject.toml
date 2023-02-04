@@ -13,9 +13,6 @@ classifiers = ["License :: OSI Approved :: Apache Software License"]
 dependencies = [
          "pyserial>=3.5",
          "crcmod>=1.7",
-         "matplotlib>=3.6",
-         "pypubsub>4.0",
-         "click>=8.1"
 ]
 
 [tool.black]
