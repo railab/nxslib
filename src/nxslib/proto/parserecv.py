@@ -7,7 +7,7 @@ from nxslib.proto.iframe import EParseError, EParseId, ICommFrame
 from nxslib.proto.iparse import DParseStreamData, EParseDataType
 from nxslib.proto.iparserecv import ICommParseRecv, ParseRecvCb
 from nxslib.proto.parse import EParseIdSetFlags, dsfmt_get, msfmt_get
-from nxslib.proto.protoframe import ProtoFrame
+from nxslib.proto.serialframe import SerialFrame
 
 ###############################################################################
 # Class: ParseRecv
@@ -20,7 +20,7 @@ class ParseRecv(ICommParseRecv):
     def __init__(
         self,
         cb: ParseRecvCb,
-        frame: type[ICommFrame] = ProtoFrame,
+        frame: type[ICommFrame] = SerialFrame,
     ):
         """Initialize the receiver side parser."""
         if not isinstance(cb, ParseRecvCb):

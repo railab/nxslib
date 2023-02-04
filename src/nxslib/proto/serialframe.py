@@ -10,11 +10,11 @@ from nxslib.proto.iframe import DParseHdr, EParseError, EParseId, ICommFrame
 from nxslib.proto.iparse import DParseFrame
 
 ###############################################################################
-# Enum: EProtoFrameHdr
+# Enum: ESerialFrameHdr
 ###############################################################################
 
 
-class EProtoFrameHdr(Enum):
+class ESerialFrameHdr(Enum):
     """NxScope serial frame header definitions."""
 
     SOF = 0x55
@@ -23,11 +23,11 @@ class EProtoFrameHdr(Enum):
 
 
 ###############################################################################
-# Class: ProtoFrame
+# Class: SerialFrame
 ###############################################################################
 
 
-class ProtoFrame(ICommFrame):
+class SerialFrame(ICommFrame):
     """A class used to parse nxslib protocol data."""
 
     def __init__(self):
@@ -45,16 +45,16 @@ class ProtoFrame(ICommFrame):
     @property
     def hdr_len(self) -> int:
         """Get the size of a header."""
-        return EProtoFrameHdr.END.value
+        return ESerialFrameHdr.END.value
 
     @property
     def foot_len(self) -> int:
         """Get the size of a footer."""
-        return EProtoFrameHdr.FOOT.value
+        return ESerialFrameHdr.FOOT.value
 
     def hdr_find(self, data: bytes) -> int:
         """Find a header in bytes."""
-        return data.find(bytes([EProtoFrameHdr.SOF.value]))
+        return data.find(bytes([ESerialFrameHdr.SOF.value]))
 
     def hdr_decode(self, data: bytes) -> DParseHdr:
         """Decode a header from bytes."""
@@ -72,9 +72,9 @@ class ProtoFrame(ICommFrame):
         # hdr always encoded in little-endian
         fmt = "<BHB"
 
-        sof, flen, _id = struct.unpack(fmt, data[: EProtoFrameHdr.END.value])
+        sof, flen, _id = struct.unpack(fmt, data[: ESerialFrameHdr.END.value])
 
-        if sof != EProtoFrameHdr.SOF.value:
+        if sof != ESerialFrameHdr.SOF.value:
             logger.error("invalid sof = %s", hex(sof))
             return DParseHdr(err=EParseError.HDR)
 
@@ -103,7 +103,7 @@ class ProtoFrame(ICommFrame):
         if self.foot_validate(data[: hdr.flen]) is False:
             return DParseFrame(err=EParseError.FOOT)
 
-        data = data[EProtoFrameHdr.END.value : hdr.flen - 2]
+        data = data[ESerialFrameHdr.END.value : hdr.flen - 2]
 
         return DParseFrame(fid=hdr.fid, data=data)
 
@@ -118,7 +118,7 @@ class ProtoFrame(ICommFrame):
 
         # encode header - always encoded in little-endian
         fmt = "<BHB"
-        _bytes = struct.pack(fmt, EProtoFrameHdr.SOF.value, frame_len, _id)
+        _bytes = struct.pack(fmt, ESerialFrameHdr.SOF.value, frame_len, _id)
 
         # optional data
         if data is not None:

@@ -1,12 +1,12 @@
 import pytest  # type: ignore
 
 from nxslib.proto.iframe import EParseError, ICommFrame
-from nxslib.proto.protoframe import ProtoFrame
+from nxslib.proto.serialframe import SerialFrame
 
 
 def test_nxslibproto_init():
-    proto = ProtoFrame()
-    assert isinstance(proto, ProtoFrame)
+    proto = SerialFrame()
+    assert isinstance(proto, SerialFrame)
     assert isinstance(proto, ICommFrame)
 
     # create frame - invalid id size

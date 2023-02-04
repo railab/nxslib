@@ -16,7 +16,7 @@ from nxslib.proto.iparse import (
     dsfmt_get,
     msfmt_get,
 )
-from nxslib.proto.protoframe import ProtoFrame
+from nxslib.proto.serialframe import SerialFrame
 
 ###############################################################################
 # Class: Parser
@@ -26,7 +26,7 @@ from nxslib.proto.protoframe import ProtoFrame
 class Parser(ICommParse):
     """A class used to a represent NxScope parser."""
 
-    def __init__(self, frame: type[ICommFrame] = ProtoFrame):
+    def __init__(self, frame: type[ICommFrame] = SerialFrame):
         """Initialize the Nxslib parser."""
         self._frame = frame()
 

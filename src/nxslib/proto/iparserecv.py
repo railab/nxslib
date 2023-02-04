@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from nxslib.dev import Device, DeviceChannel
 from nxslib.proto.iframe import ICommFrame
-from nxslib.proto.protoframe import ProtoFrame
+from nxslib.proto.serialframe import SerialFrame
 
 ###############################################################################
 # Class: ParseRecvCb
@@ -36,7 +36,7 @@ class ICommParseRecv(ABC):
     def __init__(
         self,
         cb: ParseRecvCb,
-        frame: type[ICommFrame] = ProtoFrame,
+        frame: type[ICommFrame] = SerialFrame,
     ):
         """Initialize the receiver parser."""
 

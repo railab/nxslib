@@ -6,7 +6,7 @@ from nxslib.proto.iparse import DParseStreamData, EParseIdSetFlags
 from nxslib.proto.iparserecv import ParseRecvCb
 from nxslib.proto.parse import Parser
 from nxslib.proto.parserecv import ParseRecv
-from nxslib.proto.protoframe import ProtoFrame
+from nxslib.proto.serialframe import SerialFrame
 
 
 def cb_cmninfo(data):
@@ -33,14 +33,14 @@ def test_nxslibparserecv_fames():
     # invalid recv_cb
     recv_cb = {}
     with pytest.raises(TypeError):
-        recv = ParseRecv(cb=recv_cb, frame=ProtoFrame)
+        recv = ParseRecv(cb=recv_cb, frame=SerialFrame)
 
     recv_cb = {"test": cb_cmninfo}
     with pytest.raises(TypeError):
-        recv = ParseRecv(cb=recv_cb, frame=ProtoFrame)
+        recv = ParseRecv(cb=recv_cb, frame=SerialFrame)
 
     recv_cb = ParseRecvCb(cb_cmninfo, cb_chinfo, cb_enable, cb_div, cb_start)
-    recv = ParseRecv(cb=recv_cb, frame=ProtoFrame)
+    recv = ParseRecv(cb=recv_cb, frame=SerialFrame)
     assert isinstance(recv, ParseRecv)
 
     # no data
@@ -64,7 +64,7 @@ def test_nxslibparserecv_fames():
     assert recv.recv_handle(_bytes) is None
 
     # create parser
-    parser = Parser(frame=ProtoFrame)
+    parser = Parser(frame=SerialFrame)
 
     # valid cmninfo frame
     _bytes = parser.frame_cmninfo()
@@ -94,7 +94,7 @@ def test_nxslibparserecv_fames():
     _bytes = parser.frame_start(True)
     assert recv.recv_handle(_bytes) is None
 
-    frame = ProtoFrame()
+    frame = SerialFrame()
 
     # invalid data
     _bytes = frame.frame_create(EParseId.CMNINFO, None)
@@ -127,9 +127,9 @@ def test_nxslibparserecv_fames():
 
 def test_nxslibparserecv_decode():
     recv_cb = ParseRecvCb(cb_cmninfo, cb_chinfo, cb_enable, cb_div, cb_start)
-    recv = ParseRecv(cb=recv_cb, frame=ProtoFrame)
-    parser = Parser(frame=ProtoFrame)
-    frame = ProtoFrame()
+    recv = ParseRecv(cb=recv_cb, frame=SerialFrame)
+    parser = Parser(frame=SerialFrame)
+    frame = SerialFrame()
     d = Device(
         3,
         0b11,
@@ -183,7 +183,7 @@ def test_nxslibparserecv_decode():
 
 def test_nxslibparserecv_encode():
     recv_cb = ParseRecvCb(cb_cmninfo, cb_chinfo, cb_enable, cb_div, cb_start)
-    recv = ParseRecv(cb=recv_cb, frame=ProtoFrame)
+    recv = ParseRecv(cb=recv_cb, frame=SerialFrame)
 
     # empty data
     samples = []
