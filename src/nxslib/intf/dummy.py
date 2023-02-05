@@ -379,7 +379,7 @@ class DummyDev(ICommInterface):
 
         data = None
         try:
-            data = self._qwrite.get(block=True, timeout=0)
+            data = self._qwrite.get(block=True, timeout=1.0)
         except queue.Empty:
             pass
 
