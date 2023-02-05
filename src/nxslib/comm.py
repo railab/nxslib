@@ -43,19 +43,19 @@ class CommHandler:
 
     def __init__(self, intf: ICommInterface, parse: ICommParse):
         """Initialize communication glue logic."""
-        assert isinstance(intf, ICommInterface)
-        assert isinstance(parse, ICommParse)
+        # started flag
+        self._started = False
 
         self._thrd = ThreadCommon(self._recv_thread)
+
+        assert isinstance(intf, ICommInterface)
+        assert isinstance(parse, ICommParse)
 
         self._intf = intf
         self._parse = parse
 
         self._prev_read = b""
         self._dev: Device | None = None
-
-        # started flag
-        self._started = False
 
         # recv queue
         self._q: queue.Queue[DParseFrame | None] = queue.Queue()
@@ -65,10 +65,7 @@ class CommHandler:
 
     def __del__(self):
         """Need to disconnect from the device."""
-        try:
-            self.disconnect()
-        except AttributeError:
-            pass
+        self.disconnect()
 
     def _drop_all(self) -> None:
         """Drop all frames from the interface."""
