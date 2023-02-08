@@ -3,10 +3,12 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from nxslib.dev import Device, DeviceChannel, EDeviceChannelType
-from nxslib.proto.iframe import DParseFrame, ICommFrame
+
+if TYPE_CHECKING:
+    from nxslib.proto.iframe import DParseFrame, ICommFrame
 
 ###############################################################################
 # Enum: EParseIdSetFlags
@@ -264,7 +266,7 @@ class ICommParse(ABC):
 
     @property
     @abstractmethod
-    def frame(self) -> ICommFrame:
+    def frame(self) -> "ICommFrame":
         """Get the frame handler."""
 
     @abstractmethod
@@ -289,24 +291,26 @@ class ICommParse(ABC):
 
     @abstractmethod
     def frame_stream_decode(
-        self, frame: DParseFrame, info: Device
+        self, frame: "DParseFrame", info: Device
     ) -> DParseStream | None:
         """Decode a stream frame."""
 
     @abstractmethod
-    def frame_cmninfo_decode(self, frame: DParseFrame) -> ParseCmninfo | None:
+    def frame_cmninfo_decode(
+        self, frame: "DParseFrame"
+    ) -> ParseCmninfo | None:
         """Decode a cmninfo frame."""
 
     @abstractmethod
     def frame_chinfo_decode(
-        self, frame: DParseFrame, chan: int
+        self, frame: "DParseFrame", chan: int
     ) -> DeviceChannel | None:
         """Decode a chinfo frame."""
 
     @abstractmethod
-    def frame_is_ack(self, frame: DParseFrame) -> bool:
+    def frame_is_ack(self, frame: "DParseFrame") -> bool:
         """Return true if a given frame is ACK."""
 
     @abstractmethod
-    def frame_ack_decode(self, frame: DParseFrame) -> ParseAck | None:
+    def frame_ack_decode(self, frame: "DParseFrame") -> ParseAck | None:
         """Decode ACK frame."""

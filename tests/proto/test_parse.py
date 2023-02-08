@@ -1,6 +1,6 @@
 from nxslib.dev import Device, DeviceChannel, EDeviceChannelType
-from nxslib.proto.iframe import EParseId, ICommFrame
-from nxslib.proto.iparse import DParseFrame, EParseDataType
+from nxslib.proto.iframe import DParseFrame, EParseId, ICommFrame
+from nxslib.proto.iparse import EParseDataType
 from nxslib.proto.parse import Parser
 
 

@@ -7,9 +7,8 @@ from dataclasses import dataclass
 from nxslib.dev import Device, DeviceChannel
 from nxslib.intf.iintf import ICommInterface
 from nxslib.logger import logger
-from nxslib.proto.iframe import DParseHdr, EParseError
+from nxslib.proto.iframe import DParseFrame, DParseHdr, EParseError
 from nxslib.proto.iparse import (
-    DParseFrame,
     DParseStream,
     EParseStreamFlags,
     ICommParse,

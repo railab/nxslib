@@ -1,7 +1,10 @@
 """The Nxslib common thread logic."""
 
 import threading
-from collections.abc import Callable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 ###############################################################################
 # Class: ThreadCommon
@@ -11,7 +14,7 @@ from collections.abc import Callable
 class ThreadCommon:
     """A class that handle common thread logic."""
 
-    def __init__(self, target: Callable[[], None]):
+    def __init__(self, target: "Callable[[], None]"):
         """Initialize common thread."""
         if not callable(target):
             raise TypeError

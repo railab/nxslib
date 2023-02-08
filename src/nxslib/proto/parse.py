@@ -3,9 +3,8 @@
 import struct
 
 from nxslib.dev import Device, DeviceChannel
-from nxslib.proto.iframe import EParseId, ICommFrame
+from nxslib.proto.iframe import DParseFrame, EParseId, ICommFrame
 from nxslib.proto.iparse import (
-    DParseFrame,
     DParseStream,
     DParseStreamData,
     EParseDataType,

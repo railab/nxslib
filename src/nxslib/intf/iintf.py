@@ -1,9 +1,12 @@
 """Nxslib interface abstract class."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from nxslib.logger import logger
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 ###############################################################################
 # Class: CommInterfaceCommon
@@ -14,7 +17,7 @@ class CommInterfaceCommon:
     """A class with a common Nxslib interface logic."""
 
     def __init__(
-        self, read: Callable[[], bytes], write: Callable[[bytes], None]
+        self, read: "Callable[[], bytes]", write: "Callable[[bytes], None]"
     ) -> None:
         """Initialize a common communication interface."""
         self._write_padding = 0

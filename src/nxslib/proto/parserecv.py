@@ -1,13 +1,16 @@
 """Module containing the NxScope receiver protocol logic."""
 
 import struct
+from typing import TYPE_CHECKING
 
-from nxslib.dev import Device, DeviceChannel
 from nxslib.proto.iframe import EParseError, EParseId, ICommFrame
 from nxslib.proto.iparse import DParseStreamData, EParseDataType
 from nxslib.proto.iparserecv import ICommParseRecv, ParseRecvCb
 from nxslib.proto.parse import EParseIdSetFlags, dsfmt_get, msfmt_get
 from nxslib.proto.serialframe import SerialFrame
+
+if TYPE_CHECKING:
+    from nxslib.dev import Device, DeviceChannel
 
 ###############################################################################
 # Class: ParseRecv
@@ -29,7 +32,7 @@ class ParseRecv(ICommParseRecv):
         self._recv_cb = cb
         self._frame = frame()
 
-    def _cmninfo_data_encode(self, dev: Device) -> bytes:
+    def _cmninfo_data_encode(self, dev: "Device") -> bytes:
         """Encode cmninfo frame data."""
         _bytes = b""
 
@@ -38,7 +41,7 @@ class ParseRecv(ICommParseRecv):
 
         return _bytes
 
-    def _chinfo_data_encode(self, chan: DeviceChannel) -> bytes:
+    def _chinfo_data_encode(self, chan: "DeviceChannel") -> bytes:
         """Encode info frame data."""
         _bytes = b""
 
@@ -164,7 +167,7 @@ class ParseRecv(ICommParseRecv):
         """Decode set type frame."""
         return struct.unpack("BB", data)
 
-    def frame_enable_decode(self, data: bytes, info: Device) -> list[bool]:
+    def frame_enable_decode(self, data: bytes, info: "Device") -> list[bool]:
         """Decode enable frame."""
         # decode set frame
         flags, chan = self.frame_set_decode(data[:2])
@@ -186,7 +189,7 @@ class ParseRecv(ICommParseRecv):
 
         return ret
 
-    def frame_div_decode(self, data: bytes, info: Device) -> list:
+    def frame_div_decode(self, data: bytes, info: "Device") -> list:
         """Decode divider frame."""
         # decode set frame
         flags, chan = self.frame_set_decode(data[:2])
@@ -208,12 +211,12 @@ class ParseRecv(ICommParseRecv):
 
         return ret
 
-    def frame_cmninfo_encode(self, dev: Device) -> bytes:
+    def frame_cmninfo_encode(self, dev: "Device") -> bytes:
         """Encode common info frame."""
         _bytes = self._cmninfo_data_encode(dev)
         return self._frame.frame_create(EParseId.CMNINFO, _bytes)
 
-    def frame_chinfo_encode(self, chan: DeviceChannel) -> bytes:
+    def frame_chinfo_encode(self, chan: "DeviceChannel") -> bytes:
         """Encode channel info frame."""
         _bytes = self._chinfo_data_encode(chan)
         return self._frame.frame_create(EParseId.CHINFO, _bytes)

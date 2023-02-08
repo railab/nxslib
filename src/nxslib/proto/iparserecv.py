@@ -1,12 +1,16 @@
 """Module containing common definitions for the receiver parser."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from nxslib.dev import Device, DeviceChannel
-from nxslib.proto.iframe import ICommFrame
 from nxslib.proto.serialframe import SerialFrame
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from nxslib.dev import Device, DeviceChannel
+    from nxslib.proto.iframe import ICommFrame
 
 ###############################################################################
 # Class: ParseRecvCb
@@ -17,11 +21,11 @@ from nxslib.proto.serialframe import SerialFrame
 class ParseRecvCb:
     """Receiver parser callbacks."""
 
-    cmninfo: Callable[[bytes], None]
-    chinfo: Callable[[bytes], None]
-    enable: Callable[[bytes], None]
-    div: Callable[[bytes], None]
-    start: Callable[[bytes], None]
+    cmninfo: "Callable[[bytes], None]"
+    chinfo: "Callable[[bytes], None]"
+    enable: "Callable[[bytes], None]"
+    div: "Callable[[bytes], None]"
+    start: "Callable[[bytes], None]"
 
 
 ###############################################################################
@@ -36,7 +40,7 @@ class ICommParseRecv(ABC):
     def __init__(
         self,
         cb: ParseRecvCb,
-        frame: type[ICommFrame] = SerialFrame,
+        frame: type["ICommFrame"] = SerialFrame,
     ):
         """Initialize the receiver parser."""
 
@@ -49,19 +53,19 @@ class ICommParseRecv(ABC):
         """Decode set type frame."""
 
     @abstractmethod
-    def frame_enable_decode(self, data: bytes, info: Device) -> list:
+    def frame_enable_decode(self, data: bytes, info: "Device") -> list:
         """Decode enable frame."""
 
     @abstractmethod
-    def frame_div_decode(self, data: bytes, info: Device) -> list:
+    def frame_div_decode(self, data: bytes, info: "Device") -> list:
         """Decode divider frame."""
 
     @abstractmethod
-    def frame_cmninfo_encode(self, dev: Device) -> bytes:
+    def frame_cmninfo_encode(self, dev: "Device") -> bytes:
         """Encode common info frame."""
 
     @abstractmethod
-    def frame_chinfo_encode(self, chan: DeviceChannel) -> bytes:
+    def frame_chinfo_encode(self, chan: "DeviceChannel") -> bytes:
         """Encode channel info frame."""
 
     @abstractmethod

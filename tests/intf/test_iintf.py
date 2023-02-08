@@ -12,9 +12,9 @@ def test_nxslibiintf_init():
 def test_nxslibintfcommon():
     intf = CommInterfaceCommon(None, None)
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(TypeError):
         _ = intf.read()
-    with pytest.raises(AssertionError):
+    with pytest.raises(TypeError):
         intf.write(b"xx")
 
     intf.write_padding = 16

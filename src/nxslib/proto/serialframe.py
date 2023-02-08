@@ -6,8 +6,13 @@ from enum import Enum
 import crcmod  # type: ignore
 
 from nxslib.logger import logger
-from nxslib.proto.iframe import DParseHdr, EParseError, EParseId, ICommFrame
-from nxslib.proto.iparse import DParseFrame
+from nxslib.proto.iframe import (
+    DParseFrame,
+    DParseHdr,
+    EParseError,
+    EParseId,
+    ICommFrame,
+)
 
 ###############################################################################
 # Enum: ESerialFrameHdr

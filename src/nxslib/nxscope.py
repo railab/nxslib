@@ -3,12 +3,15 @@
 import queue
 import time
 from threading import Lock
+from typing import TYPE_CHECKING
 
-from nxslib.comm import CommHandler
-from nxslib.dev import Device, DeviceChannel
 from nxslib.logger import logger
-from nxslib.proto.iparse import DParseStream
 from nxslib.thread import ThreadCommon
+
+if TYPE_CHECKING:
+    from nxslib.comm import CommHandler
+    from nxslib.dev import Device, DeviceChannel
+    from nxslib.proto.iparse import DParseStream
 
 ###############################################################################
 # Class: NxscopeHandler
@@ -20,9 +23,9 @@ class NxscopeHandler:
 
     def __init__(self) -> None:
         """Initialize the Nxslib handler."""
-        self._comm: CommHandler
+        self._comm: "CommHandler"
 
-        self._chanlist: list[DeviceChannel] = []
+        self._chanlist: list["DeviceChannel"] = []
 
         self._thrd = ThreadCommon(self._stream_thread)
 
@@ -65,7 +68,7 @@ class NxscopeHandler:
 
         return ret.state
 
-    def _nxslib_stream(self) -> DParseStream | None:
+    def _nxslib_stream(self) -> "DParseStream | None":
         """Get nxslib stream data."""
         assert self._comm
         return self._comm.stream_data()
@@ -114,7 +117,9 @@ class NxscopeHandler:
     def _reset_stats(self) -> None:
         self._ovf_cntr = 0
 
-    def _chanlist_gen(self, channels: str | list[int]) -> list[DeviceChannel]:
+    def _chanlist_gen(
+        self, channels: str | list[int]
+    ) -> list["DeviceChannel"]:
         assert self.dev
 
         # convert special key 'all'
@@ -162,13 +167,13 @@ class NxscopeHandler:
                 self.nxslib_ch_divider(channel.chan, div[i])
 
     @property
-    def dev(self) -> Device | None:
+    def dev(self) -> "Device | None":
         """Get device info."""
         assert self._comm
         return self._comm.dev
 
     @property
-    def chanlist(self) -> list[DeviceChannel]:
+    def chanlist(self) -> list["DeviceChannel"]:
         """Get configured channels list."""
         return self._chanlist
 
@@ -182,7 +187,7 @@ class NxscopeHandler:
         except AttributeError:
             return False
 
-    def connect(self) -> Device | None:
+    def connect(self) -> "Device | None":
         """Connect with a NxScope device."""
         assert self._comm
 
@@ -221,12 +226,12 @@ class NxscopeHandler:
         assert self._comm
         self._comm.ch_divider(chans, div)
 
-    def intf_connect(self, comm: CommHandler) -> None:
+    def intf_connect(self, comm: "CommHandler") -> None:
         """Connect a NxScope communication handler."""
         assert comm
         self._comm = comm
 
-    def dev_channel_get(self, chid: int) -> DeviceChannel | None:
+    def dev_channel_get(self, chid: int) -> "DeviceChannel | None":
         """Get a channel info."""
         assert self.dev
         return self.dev.channel_get(chid)
