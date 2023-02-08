@@ -57,7 +57,7 @@ class CommHandler:
         self._dev: Device | None = None
 
         # recv queue
-        self._q: queue.Queue[DParseFrame | None] = queue.Queue()
+        self._q: queue.Queue[DParseFrame] = queue.Queue()
 
         # channels configuration
         self._channels: DCommChannelsData
