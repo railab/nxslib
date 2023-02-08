@@ -21,7 +21,7 @@ class SerialDevice(ICommInterface):
          stty -F /dev/ttyNX0 115200
     """
 
-    def __init__(self, port: str, baud: int = 115200):
+    def __init__(self, port: str, baud: int = 115200) -> None:
         """Intitialize a serial interface."""
         try:
             self._ser = serial.Serial(
@@ -34,7 +34,7 @@ class SerialDevice(ICommInterface):
 
         super().__init__()
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Make sure that serial port is closed."""
         if self._ser:
             self._ser.close()

@@ -139,7 +139,7 @@ class ParseRecv(ICommParseRecv):
             raise ValueError
         self._recv_cb.start(data)
 
-    def _recv_cb_handle(self, fid, fdata):
+    def _recv_cb_handle(self, fid: EParseId, fdata: bytes) -> None:
         # STREAM frames are not accepted here
         if fid == EParseId.STREAM:
             raise ValueError

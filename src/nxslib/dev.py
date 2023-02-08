@@ -202,7 +202,7 @@ class DeviceChannel(DDeviceChannelData):
 
         self._cntr = 0
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Get channel string represenation."""
         _str = (
             "DeviceChannel "
@@ -219,7 +219,7 @@ class DeviceChannel(DDeviceChannelData):
         )
         return _str
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset channel state."""
         if self._func is not None:
             # reset func state if func attached
@@ -282,7 +282,7 @@ class Device(DDeviceData):
         if len(set(chanids)) != len(chanids):
             raise ValueError
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Get device string represenation."""
         _str = (
             "Device:"
@@ -323,13 +323,13 @@ class Device(DDeviceData):
 
         return ret
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset device state."""
         for chan in self.channels:
             # reset channels
             chan.reset()
 
-    def channel_get(self, chid) -> DeviceChannel | None:
+    def channel_get(self, chid: int) -> DeviceChannel | None:
         """Get device channel."""
         try:
             return self.channels[chid]

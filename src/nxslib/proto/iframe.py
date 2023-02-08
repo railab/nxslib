@@ -106,5 +106,5 @@ class ICommFrame(ABC):
         """Decode a frame from bytes."""
 
     @abstractmethod
-    def frame_create(self, _id: EParseId, data: bytes | None):
+    def frame_create(self, _id: EParseId, data: bytes | None) -> bytes:
         """Create a frame from data."""

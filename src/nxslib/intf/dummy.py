@@ -28,10 +28,10 @@ from nxslib.thread import ThreadCommon
 class ChannelFunc0(IDeviceChannelFunc):
     """Generate random data for channel."""
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset handler."""
 
-    def get(self, _) -> DDeviceChannelFuncData:
+    def get(self, _: int) -> DDeviceChannelFuncData:
         """Get sample data."""
         data = (random.random(),)
         return DDeviceChannelFuncData(data=data)
@@ -42,11 +42,11 @@ class ChannelFunc1(IDeviceChannelFunc):
 
     _cntr = 0
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset handler."""
         self._cntr = 0
 
-    def get(self, _) -> DDeviceChannelFuncData:
+    def get(self, _: int) -> DDeviceChannelFuncData:
         """Get sample data."""
         self._cntr += 1
         if self._cntr > 1000:
@@ -62,12 +62,12 @@ class ChannelFunc2(IDeviceChannelFunc):
     _cntr = 0
     _sign = 1
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset handler."""
         self._cntr = 0
         self._sign = 1
 
-    def get(self, _) -> DDeviceChannelFuncData:
+    def get(self, _: int) -> DDeviceChannelFuncData:
         """Get sample data."""
         self._cntr += 1 * self._sign
         if self._cntr > 1000:
@@ -82,10 +82,10 @@ class ChannelFunc2(IDeviceChannelFunc):
 class ChannelFunc3(IDeviceChannelFunc):
     """Generate vector random data."""
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset handler."""
 
-    def get(self, _) -> DDeviceChannelFuncData:
+    def get(self, _: int) -> DDeviceChannelFuncData:
         """Get sample data."""
         data = random.random(), random.random()
         return DDeviceChannelFuncData(data=data)
@@ -94,10 +94,10 @@ class ChannelFunc3(IDeviceChannelFunc):
 class ChannelFunc4(IDeviceChannelFunc):
     """Generate vector random data."""
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset handler."""
 
-    def get(self, _) -> DDeviceChannelFuncData:
+    def get(self, _: int) -> DDeviceChannelFuncData:
         """Get sample data."""
         data = random.random(), random.random(), random.random()
         return DDeviceChannelFuncData(data=data)
@@ -106,10 +106,10 @@ class ChannelFunc4(IDeviceChannelFunc):
 class ChannelFunc5(IDeviceChannelFunc):
     """Generate static data."""
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset handler."""
 
-    def get(self, _) -> DDeviceChannelFuncData:
+    def get(self, _: int) -> DDeviceChannelFuncData:
         """Get sample data."""
         data = (1.0, 0.0, -1.0)
         return DDeviceChannelFuncData(data=data)
@@ -120,11 +120,11 @@ class ChannelFunc6(IDeviceChannelFunc):
 
     _cntr = 0
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset handler."""
         self._cntr = 0
 
-    def get(self, _) -> DDeviceChannelFuncData | None:
+    def get(self, _: int) -> DDeviceChannelFuncData | None:
         """Get sample data."""
         # start from 0 - we want at leas one 'hello' emitted
         if not self._cntr % 10000:
@@ -141,11 +141,11 @@ class ChannelFunc7(IDeviceChannelFunc):
 
     _cntr = 0
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset handler."""
         self._cntr = 0
 
-    def get(self, _) -> DDeviceChannelFuncData:
+    def get(self, _: int) -> DDeviceChannelFuncData:
         """Get sample data."""
         data = (1, 0, -1)
         self._cntr += 1
@@ -156,10 +156,10 @@ class ChannelFunc7(IDeviceChannelFunc):
 class ChannelFunc8(IDeviceChannelFunc):
     """Generate static data."""
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset handler."""
 
-    def get(self, _) -> DDeviceChannelFuncData:
+    def get(self, _: int) -> DDeviceChannelFuncData:
         """Get sample data."""
         data = ()
         meta = list(b"hello" + b"\x00" * 11)  # align to 16B
@@ -261,7 +261,7 @@ class DummyDev(ICommInterface):
         rxpadding: int = 16,
         stream_sleep: float = 0.001,
         stream_snum: int = 100,
-    ):
+    ) -> None:
         """Intitialize a dummy NxScope interface."""
         super().__init__()
         self._thrd = ThreadCommon(self._thread)
@@ -283,7 +283,7 @@ class DummyDev(ICommInterface):
 
         self._parse: ParseRecv | None = None
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Make sure that interface is stoped."""
         self.stop()
 

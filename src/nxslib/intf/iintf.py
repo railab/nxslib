@@ -1,6 +1,7 @@
 """Nxslib interface abstract class."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 
 from nxslib.logger import logger
 
@@ -12,7 +13,9 @@ from nxslib.logger import logger
 class CommInterfaceCommon:
     """A class with a common Nxslib interface logic."""
 
-    def __init__(self, read, write):
+    def __init__(
+        self, read: Callable[[], bytes], write: Callable[[bytes], None]
+    ) -> None:
         """Initialize a common communication interface."""
         self._write_padding = 0
         self._fread = read
@@ -42,8 +45,6 @@ class CommInterfaceCommon:
 
     def read(self) -> bytes:
         """Read data from the interface."""
-        assert self._fread
-
         data = self._fread()
         if len(data) > 0:
             logger.debug("read=%s", data)
@@ -53,8 +54,6 @@ class CommInterfaceCommon:
     def write(self, data: bytes) -> None:
         """Write data to the interface."""
         assert isinstance(data, bytes)
-        assert self._fwrite
-
         # align data
         data = self.data_align(data)
         logger.debug("write=%s", data)
@@ -69,7 +68,7 @@ class CommInterfaceCommon:
 class ICommInterface(ABC, CommInterfaceCommon):
     """An abstract class used to a represent the Nxslib interface."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize an abstract communication interface."""
         CommInterfaceCommon.__init__(self, self._read, self._write)
 

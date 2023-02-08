@@ -34,7 +34,7 @@ class NxscopeHandler:
 
         self._ovf_cntr: int = 0
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Make sure to disconnect from dev."""
         self.disconnect()
 
@@ -137,7 +137,7 @@ class NxscopeHandler:
 
         return ret
 
-    def _chanlist_enable(self):
+    def _chanlist_enable(self) -> None:
         for channel in self._chanlist:
             # ignore not valid channels
             if not channel.is_valid:
@@ -149,7 +149,7 @@ class NxscopeHandler:
             # enable channel
             self.nxslib_ch_enable(channel.chan)
 
-    def _chanlist_div(self, div: int | list[int]):
+    def _chanlist_div(self, div: int | list[int]) -> None:
         if isinstance(div, int):
             for channel in self._chanlist:
                 self.nxslib_ch_divider(channel.chan, div)
@@ -269,7 +269,7 @@ class NxscopeHandler:
 
         return subq
 
-    def stream_unsub(self, chan: int, subq: queue.Queue):
+    def stream_unsub(self, chan: int, subq: queue.Queue) -> None:
         """Unsubscribe from a given channel."""
         with self._queue_lock:
             self._sub_q[chan].remove(subq)

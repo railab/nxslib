@@ -30,10 +30,12 @@ class Parser(ICommParse):
         """Initialize the Nxslib parser."""
         self._frame = frame()
 
-    def _frame_set_data(self, flags, chan=0) -> bytes:
+    def _frame_set_data(self, flags: int, chan: int = 0) -> bytes:
         return struct.pack("BB", flags, chan)
 
-    def _frame_set_single(self, _id: EParseId, data: bytes, chan) -> bytes:
+    def _frame_set_single(
+        self, _id: EParseId, data: bytes, chan: int
+    ) -> bytes:
         """Set single channel frame."""
         assert len(data) == 1
         _bytes = self._frame_set_data(EParseIdSetFlags.SINGLE, chan)

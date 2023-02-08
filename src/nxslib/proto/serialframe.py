@@ -30,7 +30,7 @@ class ESerialFrameHdr(Enum):
 class SerialFrame(ICommFrame):
     """A class used to parse nxslib protocol data."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the NxScope serial protocol parser.
 
         Parameters

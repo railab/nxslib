@@ -63,7 +63,7 @@ class CommHandler:
         # channels configuration
         self._channels: DCommChannelsData
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Need to disconnect from the device."""
         self.disconnect()
 
@@ -358,7 +358,7 @@ class CommHandler:
         for i, _ in enumerate(self._channels.div_new):
             self._channels.div_new[i] = 0
 
-    def _channels_init(self, info: Device):
+    def _channels_init(self, info: Device) -> None:
         """Initialize channels."""
         self._channels = DCommChannelsData(
             copy.deepcopy(info.channels_en),
@@ -418,7 +418,7 @@ class CommHandler:
 
         return ret
 
-    def stream_channels_init(self, info) -> None:
+    def stream_channels_init(self, info: Device) -> None:
         """Initialize channels for stream."""
         assert self.dev
         if info.div_supported:
@@ -485,12 +485,12 @@ class CommHandler:
         for chan in range(self.dev.chmax):
             self.ch_disable(chan)
 
-    def ch_is_enabled(self, chan) -> bool:
+    def ch_is_enabled(self, chan: int) -> bool:
         """Return True if channel is enabled."""
         assert self._channels
         return self._channels.en_now[chan]
 
-    def ch_div_get(self, chan) -> int:
+    def ch_div_get(self, chan: int) -> int:
         """Get channel divider."""
         assert self._channels
         return self._channels.div_now[chan]
