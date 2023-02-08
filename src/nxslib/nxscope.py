@@ -117,17 +117,13 @@ class NxscopeHandler:
     def _reset_stats(self) -> None:
         self._ovf_cntr = 0
 
-    def _chanlist_gen(
-        self, channels: str | list[int]
-    ) -> list["DeviceChannel"]:
+    def _chanlist_gen(self, channels: list[int]) -> list["DeviceChannel"]:
         assert self.dev
+        assert isinstance(channels, list)
 
-        # convert special key 'all'
-        if isinstance(channels, str):
-            if channels == "all":
-                chanlist = list(range(self.dev.chmax))
-            else:
-                raise TypeError
+        # convert special keys for all channels
+        if channels and channels[0] == -1:
+            chanlist = list(range(self.dev.chmax))
         else:
             assert all(isinstance(x, int) for x in channels)
             chanlist = channels
@@ -280,7 +276,7 @@ class NxscopeHandler:
             self._sub_q[chan].remove(subq)
 
     def channels_configure(
-        self, channels: str | list[int], div: int | list[int] = 0
+        self, channels: list[int], div: int | list[int] = 0
     ) -> None:
         """Configure channels."""
         assert self.dev

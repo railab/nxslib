@@ -162,19 +162,19 @@ def test_nxslib_channels_configure():
     nxslib.channels_configure([1, 2], [1, 1])
     nxslib.channels_configure([1, 2, 3], 1)
     nxslib.channels_configure([1, 2, 3], [1, 2, 3])
-    nxslib.channels_configure("all", 4)
+    nxslib.channels_configure([-1], 4)
 
     # unsupported channel type
-    with pytest.raises(TypeError):
+    with pytest.raises(AssertionError):
         nxslib.channels_configure(None, 1)
 
     # unsupported channel string
-    with pytest.raises(TypeError):
+    with pytest.raises(AssertionError):
         nxslib.channels_configure("bal", 1)
 
     # unsupported channel
-    with pytest.raises(TypeError):
-        nxslib.channels_configure(256, 1)
+    with pytest.raises(AssertionError):
+        nxslib.channels_configure([256], 1)
 
     # channels len != div len
     with pytest.raises(TypeError):
