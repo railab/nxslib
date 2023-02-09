@@ -232,11 +232,11 @@ class NxscopeHandler:
         assert self.dev
         return self.dev.channel_get(chid)
 
-    def stream_start(self, force: bool = False) -> None:
+    def stream_start(self) -> None:
         """Start NxScope stream."""
         assert self._comm
 
-        if not self._stream_started or force:
+        if not self._stream_started:
             # initialize stream
             self._nxslib_stream_init()
 
@@ -248,11 +248,11 @@ class NxscopeHandler:
 
             self._stream_started = True
 
-    def stream_stop(self, force: bool = False) -> None:
+    def stream_stop(self) -> None:
         """Stop NxScope stream."""
         assert self._comm
 
-        if self._stream_started is True or force is True:
+        if self._stream_started is True:
             # stop request for nxslib
             self._nxslib_stop()
 
