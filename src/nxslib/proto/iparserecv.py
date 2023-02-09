@@ -53,11 +53,11 @@ class ICommParseRecv(ABC):
         """Decode set type frame."""
 
     @abstractmethod
-    def frame_enable_decode(self, data: bytes, info: "Device") -> list:
+    def frame_enable_decode(self, data: bytes, dev: "Device") -> list:
         """Decode enable frame."""
 
     @abstractmethod
-    def frame_div_decode(self, data: bytes, info: "Device") -> list:
+    def frame_div_decode(self, data: bytes, dev: "Device") -> list:
         """Decode divider frame."""
 
     @abstractmethod

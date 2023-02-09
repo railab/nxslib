@@ -26,7 +26,10 @@ class Parser(ICommParse):
     """A class used to a represent NxScope parser."""
 
     def __init__(self, frame: type[ICommFrame] = SerialFrame):
-        """Initialize the Nxslib parser."""
+        """Initialize the Nxslib parser.
+
+        :param frame: instance of the frame parser
+        """
         self._frame = frame()
 
     def _frame_set_data(self, flags: int, chan: int = 0) -> bytes:
@@ -125,7 +128,7 @@ class Parser(ICommParse):
         return self._frame_set_bulk(EParseId.DIV, data)
 
     def frame_stream_decode(
-        self, frame: DParseFrame, info: Device
+        self, frame: DParseFrame, dev: Device
     ) -> DParseStream | None:
         """Decode a stream frame."""
         # no data
@@ -145,7 +148,7 @@ class Parser(ICommParse):
         i = 1
         while i < len(frame.data):
             # first byte in stream data sequence - channel id
-            chan = info.channel_get(frame.data[i])
+            chan = dev.channel_get(frame.data[i])
             assert chan
             i += 1
 

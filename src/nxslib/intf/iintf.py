@@ -19,7 +19,11 @@ class CommInterfaceCommon:
     def __init__(
         self, read: "Callable[[], bytes]", write: "Callable[[bytes], None]"
     ) -> None:
-        """Initialize a common communication interface."""
+        """Initialize a common communication interface.
+
+        :param read: interface specific read
+        :param write: interface specific method
+        """
         self._write_padding = 0
         self._fread = read
         self._fwrite = write
@@ -31,11 +35,17 @@ class CommInterfaceCommon:
 
     @write_padding.setter
     def write_padding(self, val: int) -> None:
-        """Set the write padding."""
+        """Set the write padding.
+
+        :param data: write padding to set
+        """
         self._write_padding = val
 
     def data_align(self, data: bytes) -> bytes:
-        """Align data according to the configured write padding."""
+        """Align data according to the configured write padding.
+
+        :param data: bytes to be aligned
+        """
         assert isinstance(data, bytes)
 
         if self._write_padding:
@@ -55,7 +65,10 @@ class CommInterfaceCommon:
         return data
 
     def write(self, data: bytes) -> None:
-        """Write data to the interface."""
+        """Write data to the interface.
+
+        :param data: bytes to send
+        """
         assert isinstance(data, bytes)
         # align data
         data = self.data_align(data)
@@ -93,4 +106,7 @@ class ICommInterface(ABC, CommInterfaceCommon):
 
     @abstractmethod
     def _write(self, data: bytes) -> None:
-        """Interface specific write method."""
+        """Interface specific write method.
+
+        :param data: bytes to send
+        """

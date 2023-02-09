@@ -15,7 +15,10 @@ class ThreadCommon:
     """A class that handle common thread logic."""
 
     def __init__(self, target: "Callable[[], None]"):
-        """Initialize common thread."""
+        """Initialize common thread.
+
+        :param: callable object to be invoked
+        """
         if not callable(target):
             raise TypeError
 

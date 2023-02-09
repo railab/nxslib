@@ -25,7 +25,11 @@ class ParseRecv(ICommParseRecv):
         cb: ParseRecvCb,
         frame: type[ICommFrame] = SerialFrame,
     ):
-        """Initialize the receiver side parser."""
+        """Initialize the receiver side parser.
+
+        :param cb: recevier callbacks
+        :param frame: instance of the frame parser
+        """
         if not isinstance(cb, ParseRecvCb):
             raise TypeError
 
@@ -167,45 +171,45 @@ class ParseRecv(ICommParseRecv):
         """Decode set type frame."""
         return struct.unpack("BB", data)
 
-    def frame_enable_decode(self, data: bytes, info: "Device") -> list[bool]:
+    def frame_enable_decode(self, data: bytes, dev: "Device") -> list[bool]:
         """Decode enable frame."""
         # decode set frame
         flags, chan = self.frame_set_decode(data[:2])
 
         if flags == EParseIdSetFlags.BULK.value:
-            fmt = str(info.chmax) + "?"
-            ret = list(struct.unpack(fmt, data[2 : 2 + info.chmax]))
+            fmt = str(dev.chmax) + "?"
+            ret = list(struct.unpack(fmt, data[2 : 2 + dev.chmax]))
         elif flags == EParseIdSetFlags.SINGLE.value:
             fmt = "?"
             en = struct.unpack(fmt, data[2:3])[0]
-            ret = info.channels_en
+            ret = dev.channels_en
             ret[chan] = bool(en)
         elif flags == EParseIdSetFlags.ALL.value:
             fmt = "?"
             en = struct.unpack(fmt, data[2:3])[0]
-            ret = [en for i in range(info.chmax)]
+            ret = [en for i in range(dev.chmax)]
         else:
             raise ValueError
 
         return ret
 
-    def frame_div_decode(self, data: bytes, info: "Device") -> list:
+    def frame_div_decode(self, data: bytes, dev: "Device") -> list:
         """Decode divider frame."""
         # decode set frame
         flags, chan = self.frame_set_decode(data[:2])
 
         if flags == EParseIdSetFlags.BULK.value:
-            fmt = str(info.chmax) + "b"
-            ret = list(struct.unpack(fmt, data[2 : 2 + info.chmax]))
+            fmt = str(dev.chmax) + "b"
+            ret = list(struct.unpack(fmt, data[2 : 2 + dev.chmax]))
         elif flags == EParseIdSetFlags.SINGLE.value:
             fmt = "b"
             div = struct.unpack(fmt, data[2:3])[0]
-            ret = info.channels_div
+            ret = dev.channels_div
             ret[chan] = div
         elif flags == EParseIdSetFlags.ALL.value:
             fmt = "b"
             div = struct.unpack(fmt, data[2:3])[0]
-            ret = [div for i in range(info.chmax)]
+            ret = [div for i in range(dev.chmax)]
         else:
             raise ValueError
 

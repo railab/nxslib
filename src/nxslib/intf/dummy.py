@@ -443,5 +443,8 @@ class DummyDev(ICommInterface):
         return data
 
     def _write(self, data: bytes) -> None:
-        """Interface specific write method."""
+        """Interface specific write method.
+
+        :param data: bytes to send
+        """
         self._qwrite.put(data)

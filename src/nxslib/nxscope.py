@@ -213,22 +213,35 @@ class NxscopeHandler:
         self._comm.channels_default_cfg()
 
     def nxslib_ch_enable(self, chans: list | int) -> None:
-        """Enable a given channels."""
+        """Enable a given channels.
+
+        :param chans: single channel ID or list with channels IDs
+        """
         assert self._comm
         self._comm.ch_enable(chans)
 
     def nxslib_ch_divider(self, chans: list | int, div: int) -> None:
-        """Configure divider for a given channels."""
+        """Configure divider for a given channels.
+
+        :param chans: single channel ID or list with channels IDs
+        :param div: divider value to be set
+        """
         assert self._comm
         self._comm.ch_divider(chans, div)
 
     def intf_connect(self, comm: "CommHandler") -> None:
-        """Connect a NxScope communication handler."""
+        """Connect a NxScope communication handler.
+
+        :param comm: communication handler
+        """
         assert comm
         self._comm = comm
 
     def dev_channel_get(self, chid: int) -> "DeviceChannel | None":
-        """Get a channel info."""
+        """Get a channel info.
+
+        :param chid: the channel ID
+        """
         assert self.dev
         return self.dev.channel_get(chid)
 
@@ -262,7 +275,10 @@ class NxscopeHandler:
             self._stream_started = False
 
     def stream_sub(self, chan: int) -> queue.Queue:
-        """Subscribe to a given channel."""
+        """Subscribe to a given channel.
+
+        :param chid: the channel ID
+        """
         subq: queue.Queue[list[tuple]] = queue.Queue()
 
         with self._queue_lock:
@@ -271,14 +287,22 @@ class NxscopeHandler:
         return subq
 
     def stream_unsub(self, chan: int, subq: queue.Queue) -> None:
-        """Unsubscribe from a given channel."""
+        """Unsubscribe from a given channel.
+
+        :param chid: the channel ID
+        :param subq: the queue instance that was used with the channel
+        """
         with self._queue_lock:
             self._sub_q[chan].remove(subq)
 
     def channels_configure(
         self, channels: list[int], div: int | list[int] = 0
     ) -> None:
-        """Configure channels."""
+        """Configure channels.
+
+        :param chans: a list with channels IDs
+        :param div: a list with divider values
+        """
         assert self.dev
 
         logger.info("configure channels = %s divider = %d", str(channels), div)

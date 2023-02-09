@@ -36,13 +36,7 @@ class SerialFrame(ICommFrame):
     """A class used to parse nxslib protocol data."""
 
     def __init__(self) -> None:
-        """Initialize the NxScope serial protocol parser.
-
-        Parameters
-        ----------
-        func : dict, optional
-          nxslib request callbacks
-        """
+        """Initialize the NxScope serial protocol parser."""
         super().__init__()
 
         self._crc16_func = crcmod.predefined.mkCrcFun("xmodem")
@@ -58,11 +52,17 @@ class SerialFrame(ICommFrame):
         return ESerialFrameHdr.FOOT.value
 
     def hdr_find(self, data: bytes) -> int:
-        """Find a header in bytes."""
+        """Find a header in bytes.
+
+        :param data: bytes to search
+        """
         return data.find(bytes([ESerialFrameHdr.SOF.value]))
 
     def hdr_decode(self, data: bytes) -> DParseHdr:
-        """Decode a header from bytes."""
+        """Decode a header from bytes.
+
+        :param data: bytes to decode
+        """
         # no data
         if data is None:
             return DParseHdr(err=EParseError.HDR)
@@ -92,7 +92,10 @@ class SerialFrame(ICommFrame):
         return DParseHdr(fid=fid, flen=flen)
 
     def foot_validate(self, data: bytes) -> bool:
-        """Validate a frame footer."""
+        """Validate a frame footer.
+
+        :param data: bytes to validate
+        """
         crc = self._crc16_func(data)
         if crc != 0:
             logger.error("invalid crc16 = %s", hex(crc))
@@ -100,7 +103,10 @@ class SerialFrame(ICommFrame):
         return True
 
     def frame_decode(self, data: bytes) -> DParseFrame:
-        """Decode a frame from bytes."""
+        """Decode a frame from bytes.
+
+        :param data: bytes to decode
+        """
         hdr = self.hdr_decode(data)
         if hdr.err is not EParseError.NOERR:
             return DParseFrame(err=hdr.err)
@@ -112,18 +118,22 @@ class SerialFrame(ICommFrame):
 
         return DParseFrame(fid=hdr.fid, data=data)
 
-    def frame_create(self, _id: EParseId, data: bytes | None) -> bytes:
-        """Create a frame from data."""
+    def frame_create(self, fid: EParseId, data: bytes | None) -> bytes:
+        """Create a frame from data.
+
+        :param fid: frame ID
+        :param data: frame data
+        """
         frame_len = 6
         if data is not None:
             frame_len += len(data)
 
-        if _id > 255:
+        if fid > 255:
             raise ValueError
 
         # encode header - always encoded in little-endian
         fmt = "<BHB"
-        _bytes = struct.pack(fmt, ESerialFrameHdr.SOF.value, frame_len, _id)
+        _bytes = struct.pack(fmt, ESerialFrameHdr.SOF.value, frame_len, fid)
 
         # optional data
         if data is not None:

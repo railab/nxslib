@@ -91,20 +91,36 @@ class ICommFrame(ABC):
 
     @abstractmethod
     def hdr_find(self, data: bytes) -> int:
-        """Find a header in bytes."""
+        """Find a header in bytes.
 
-    @abstractmethod
-    def foot_validate(self, data: bytes) -> bool:
-        """Validate a frame footer."""
+        :param data: bytes to search
+        """
 
     @abstractmethod
     def hdr_decode(self, data: bytes) -> DParseHdr:
-        """Decode a header from bytes."""
+        """Decode a header from bytes.
+
+        :param data: bytes to decode
+        """
+
+    @abstractmethod
+    def foot_validate(self, data: bytes) -> bool:
+        """Validate a frame footer.
+
+        :param data: bytes to validate
+        """
 
     @abstractmethod
     def frame_decode(self, data: bytes) -> DParseFrame:
-        """Decode a frame from bytes."""
+        """Decode a frame from bytes.
+
+        :param data: bytes to decode
+        """
 
     @abstractmethod
-    def frame_create(self, _id: EParseId, data: bytes | None) -> bytes:
-        """Create a frame from data."""
+    def frame_create(self, fid: EParseId, data: bytes | None) -> bytes:
+        """Create a frame from data.
+
+        :param fid: frame ID
+        :param data: frame data
+        """

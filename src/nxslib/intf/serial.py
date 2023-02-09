@@ -22,7 +22,11 @@ class SerialDevice(ICommInterface):
     """
 
     def __init__(self, port: str, baud: int = 115200) -> None:
-        """Intitialize a serial interface."""
+        """Intitialize a serial interface.
+
+        :param port: path to the serial port device
+        :param baud: baud rate
+        """
         try:
             self._ser = serial.Serial(
                 port, baud, timeout=1, bytesize=8, parity="N", stopbits=1
@@ -57,5 +61,8 @@ class SerialDevice(ICommInterface):
         return self._ser.read(self._ser.in_waiting)
 
     def _write(self, data: bytes) -> None:
-        """Interface specific write method."""
+        """Interface specific write method.
+
+        :param data: bytes to send
+        """
         self._ser.write(data)

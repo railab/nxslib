@@ -41,7 +41,11 @@ class CommHandler:
     """A class implementing the Nxslib communication glue logic."""
 
     def __init__(self, intf: ICommInterface, parse: ICommParse):
-        """Initialize communication glue logic."""
+        """Initialize communication glue logic.
+
+        :param intf: instance of a communication interface
+        :param parse: instance of a parser class
+        """
         # started flag
         self._started = False
 
@@ -91,6 +95,7 @@ class CommHandler:
         return frame
 
     def _get_ack(self, timeout: float = 1.0) -> ParseAck:
+        """Get ACK response."""
         # return ACK if ACK frames not supported or we don't know yet
         if self.dev is None or not self.dev.ack_supported:
             return ParseAck(True, 0)
@@ -300,7 +305,10 @@ class CommHandler:
         return self._parse.frame_cmninfo_decode(fread)
 
     def _nxslib_chinfo(self, chan: int) -> DeviceChannel | None:
-        """Get nxslib chinfo."""
+        """Get nxslib chinfo.
+
+        :param chan: channel ID
+        """
         chinfo = self._parse.frame_chinfo(chan)
         self._intf.write(chinfo)
 
@@ -357,13 +365,16 @@ class CommHandler:
         for i, _ in enumerate(self._channels.div_new):
             self._channels.div_new[i] = 0
 
-    def _channels_init(self, info: Device) -> None:
-        """Initialize channels."""
+    def _channels_init(self, dev: Device) -> None:
+        """Initialize channels.
+
+        :param dev: Nxscope device instance
+        """
         self._channels = DCommChannelsData(
-            copy.deepcopy(info.channels_en),
-            copy.deepcopy(info.channels_en),
-            copy.deepcopy(info.channels_div),
-            copy.deepcopy(info.channels_div),
+            copy.deepcopy(dev.channels_en),
+            copy.deepcopy(dev.channels_en),
+            copy.deepcopy(dev.channels_div),
+            copy.deepcopy(dev.channels_div),
         )
 
     @property
@@ -380,9 +391,12 @@ class CommHandler:
         """Disconnect from a nxslib device."""
         self._stop()
 
-    def flags_is_overflow(self, data: int) -> bool:
-        """Return stream OVERFLOW flag state."""
-        return bool(data & EParseStreamFlags.OVERFLOW.value)
+    def flags_is_overflow(self, flag: int) -> bool:
+        """Return stream OVERFLOW flag state.
+
+        :param data: flag to check
+        """
+        return bool(flag & EParseStreamFlags.OVERFLOW.value)
 
     def stream_start(self) -> ParseAck | None:
         """Start stream."""
@@ -417,10 +431,13 @@ class CommHandler:
 
         return ret
 
-    def stream_channels_init(self, info: Device) -> None:
-        """Initialize channels for stream."""
+    def stream_channels_init(self, dev: Device) -> None:
+        """Initialize channels for stream.
+
+        :param dev: Nxscope device instance
+        """
         assert self.dev
-        if info.div_supported:
+        if dev.div_supported:
             # send div request
             self._nxslib_channels_div()
 
@@ -433,7 +450,10 @@ class CommHandler:
         self.stream_channels_init(self.dev)
 
     def ch_enable(self, chans: list | int) -> None:
-        """Enable specific channel."""
+        """Enable specific channel.
+
+        :param chans: single channel ID or a list with channels IDs
+        """
         assert self._channels
         if isinstance(chans, list):
             for chan in chans:
@@ -444,7 +464,10 @@ class CommHandler:
             raise TypeError
 
     def ch_disable(self, chans: list | int) -> None:
-        """Disable specific channel."""
+        """Disable specific channel.
+
+        :param chans: single channel ID or a list with channels IDs
+        """
         assert self._channels
         if isinstance(chans, list):
             for chan in chans:
@@ -455,7 +478,11 @@ class CommHandler:
             raise TypeError
 
     def ch_divider(self, chans: list | int, div: int) -> None:
-        """Set channel divider."""
+        """Set channel divider.
+
+        :param chans: single channel ID or a list with channels IDs
+        :param div: divider value to be set
+        """
         assert self._channels
         assert self.dev
         if div < 0 or div > 255:
@@ -485,12 +512,18 @@ class CommHandler:
             self.ch_disable(chan)
 
     def ch_is_enabled(self, chan: int) -> bool:
-        """Return True if channel is enabled."""
+        """Return True if channel is enabled.
+
+        :param chan: channel ID
+        """
         assert self._channels
         return self._channels.en_now[chan]
 
     def ch_div_get(self, chan: int) -> int:
-        """Get channel divider."""
+        """Get channel divider.
+
+        :param chid: the channel ID
+        """
         assert self._channels
         return self._channels.div_now[chan]
 

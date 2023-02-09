@@ -291,7 +291,7 @@ class ICommParse(ABC):
 
     @abstractmethod
     def frame_stream_decode(
-        self, frame: "DParseFrame", info: Device
+        self, frame: "DParseFrame", dev: Device
     ) -> DParseStream | None:
         """Decode a stream frame."""
 

@@ -169,24 +169,14 @@ class DeviceChannel(DDeviceChannelData):
     ):
         """Initialize a NxScope device channel.
 
-        Parameters
-        ----------
-          chan : int
-            nxslib channel id
-          _type :
-            intnxslib channel type
-          vdim : int
-            type vector dimension
-          name : str
-            channel name
-          en : bool
-            channel enable/disable
-          div : int
-            channel samples divider
-          mlen : int
-            the size of channel meta data
-          func : function, optional
-            function used to generate channel data
+        :param type: channel id
+        :param _type: channel type
+        :param vdim: sample data dimension
+        :param name: channel name
+        :param en: enable or disable channel
+        :param div: samples divider
+        :param mlen: size of the channel metadata
+        :param func: function used to get data from the channel
         """
         # assert isinstance(en, bool) # TODO: fixme
         super().__init__(chan, _type, vdim, name, bool(en), div, mlen)
@@ -253,16 +243,10 @@ class Device(DDeviceData):
     ):
         """Initialize the NxScope device.
 
-        Parameters
-        ----------
-          chmax : int
-            the maximum number of supported channels
-          flags : EDeviceFlags
-            nxslib device flags
-          rxspadding:
-            todo
-          channels : tuple/list of DeviceChannel
-            nxslib device channels
+        :param chmax: the maximum number of supported channels
+        :param flags: device flags
+        :param rxpadding: RX padding
+        :param channels: device channels
         """
         super().__init__(chmax, flags, rxpadding, channels)
 
@@ -330,7 +314,10 @@ class Device(DDeviceData):
             chan.reset()
 
     def channel_get(self, chid: int) -> DeviceChannel | None:
-        """Get device channel."""
+        """Get device channel.
+
+        :param chid: channel ID
+        """
         try:
             return self.channels[chid]
         except IndexError:
