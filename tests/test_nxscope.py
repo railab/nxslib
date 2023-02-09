@@ -177,7 +177,7 @@ def test_nxslib_channels_configure():
         nxslib.channels_configure([256], 1)
 
     # channels len != div len
-    with pytest.raises(TypeError):
+    with pytest.raises(AssertionError):
         nxslib.channels_configure([1, 2, 3], [1, 2])
 
     # disconnect

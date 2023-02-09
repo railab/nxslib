@@ -32,11 +32,11 @@ def cb_start(data):
 def test_nxslibparserecv_fames():
     # invalid recv_cb
     recv_cb = {}
-    with pytest.raises(TypeError):
+    with pytest.raises(AssertionError):
         recv = ParseRecv(cb=recv_cb, frame=SerialFrame)
 
     recv_cb = {"test": cb_cmninfo}
-    with pytest.raises(TypeError):
+    with pytest.raises(AssertionError):
         recv = ParseRecv(cb=recv_cb, frame=SerialFrame)
 
     recv_cb = ParseRecvCb(cb_cmninfo, cb_chinfo, cb_enable, cb_div, cb_start)
@@ -103,25 +103,25 @@ def test_nxslibparserecv_fames():
     _bytes = bytes(_bytes)
     assert recv.recv_handle(_bytes) is None
     _bytes = frame.frame_create(EParseId.CMNINFO, b"\x00")
-    with pytest.raises(ValueError):
+    with pytest.raises(AssertionError):
         recv.recv_handle(_bytes)
     _bytes = frame.frame_create(EParseId.CHINFO, b"\x00\x00")
-    with pytest.raises(ValueError):
+    with pytest.raises(AssertionError):
         recv.recv_handle(_bytes)
     _bytes = frame.frame_create(EParseId.ENABLE, None)
-    with pytest.raises(ValueError):
+    with pytest.raises(AssertionError):
         recv.recv_handle(_bytes)
     _bytes = frame.frame_create(EParseId.DIV, None)
-    with pytest.raises(ValueError):
+    with pytest.raises(AssertionError):
         recv.recv_handle(_bytes)
     _bytes = frame.frame_create(EParseId.START, None)
-    with pytest.raises(ValueError):
+    with pytest.raises(AssertionError):
         recv.recv_handle(_bytes)
     _bytes = frame.frame_create(EParseId.STREAM, None)
-    with pytest.raises(ValueError):
+    with pytest.raises(AssertionError):
         recv.recv_handle(_bytes)
     _bytes = frame.frame_create(EParseId.INVALID, None)
-    with pytest.raises(ValueError):
+    with pytest.raises(AssertionError):
         recv.recv_handle(_bytes)
 
 

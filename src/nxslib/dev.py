@@ -181,8 +181,8 @@ class DeviceChannel(DDeviceChannelData):
         # assert isinstance(en, bool) # TODO: fixme
         super().__init__(chan, _type, vdim, name, bool(en), div, mlen)
 
-        if func is not None and not isinstance(func, IDeviceChannelFunc):
-            raise TypeError
+        if func is not None:
+            assert isinstance(func, IDeviceChannelFunc)
 
         # force name to be string
         if self.name is None:
@@ -250,21 +250,16 @@ class Device(DDeviceData):
         """
         super().__init__(chmax, flags, rxpadding, channels)
 
-        if len(self.channels) != self.chmax:
-            raise TypeError
-
+        assert len(self.channels) == self.chmax
         self.channels = []
         chanids = []
         for chan in channels:
-            if not isinstance(chan, DeviceChannel):
-                raise TypeError
-
+            assert isinstance(chan, DeviceChannel)
             self.channels.append(chan)
             chanids.append(chan.chan)
 
         # all channels should have unique ids
-        if len(set(chanids)) != len(chanids):
-            raise ValueError
+        assert len(set(chanids)) == len(chanids)
 
     def __str__(self) -> str:
         """Get device string represenation."""

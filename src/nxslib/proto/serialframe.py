@@ -124,12 +124,10 @@ class SerialFrame(ICommFrame):
         :param fid: frame ID
         :param data: frame data
         """
+        assert fid <= 255
         frame_len = 6
         if data is not None:
             frame_len += len(data)
-
-        if fid > 255:
-            raise ValueError
 
         # encode header - always encoded in little-endian
         fmt = "<BHB"

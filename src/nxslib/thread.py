@@ -19,10 +19,7 @@ class ThreadCommon:
 
         :param: callable object to be invoked
         """
-        if not callable(target):
-            raise TypeError
-
-        # thread
+        assert callable(target)
         self._target = target
         self._thrd: threading.Thread | None = None
         self._stop_flag = threading.Event()

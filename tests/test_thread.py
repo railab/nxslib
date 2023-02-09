@@ -9,10 +9,10 @@ def thread():
 
 def test_thread_init():
     # invalid thread type
-    with pytest.raises(TypeError):
+    with pytest.raises(AssertionError):
         thr = ThreadCommon(None)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AssertionError):
         thr = ThreadCommon(1)
 
     # valid thread type

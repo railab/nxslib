@@ -10,7 +10,7 @@ def test_nxslibproto_init():
     assert isinstance(proto, ICommFrame)
 
     # create frame - invalid id size
-    with pytest.raises(ValueError):
+    with pytest.raises(AssertionError):
         _ = proto.frame_create(2500, None)
 
     # no data

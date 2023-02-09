@@ -30,9 +30,7 @@ class ParseRecv(ICommParseRecv):
         :param cb: recevier callbacks
         :param frame: instance of the frame parser
         """
-        if not isinstance(cb, ParseRecvCb):
-            raise TypeError
-
+        assert isinstance(cb, ParseRecvCb)
         self._recv_cb = cb
         self._frame = frame()
 
@@ -118,38 +116,31 @@ class ParseRecv(ICommParseRecv):
 
     def _recv_cb_cmninfo(self, data: bytes) -> None:
         """Handle recv cmninfo request."""
-        if len(data) != 0:
-            raise ValueError
+        assert len(data) == 0
         self._recv_cb.cmninfo(data)
 
     def _recv_cb_chinfo(self, data: bytes) -> None:
         """Handle recv chinfo request."""
-        if len(data) != 1:
-            raise ValueError
+        assert len(data) == 1
         self._recv_cb.chinfo(data)
 
     def _recv_cb_enable(self, data: bytes) -> None:
         """Handle recv enable request."""
-        if len(data) == 0:
-            raise ValueError
+        assert len(data) != 0
         self._recv_cb.enable(data)
 
     def _recv_cb_div(self, data: bytes) -> None:
         """Handle recv div request."""
-        if len(data) == 0:
-            raise ValueError
+        assert len(data) != 0
         self._recv_cb.div(data)
 
     def _recv_cb_start(self, data: bytes) -> None:
         """Handle recv start request."""
-        if len(data) != 1:
-            raise ValueError
+        assert len(data) == 1
         self._recv_cb.start(data)
 
     def _recv_cb_handle(self, fid: EParseId, fdata: bytes) -> None:
         # STREAM frames are not accepted here
-        if fid == EParseId.STREAM:
-            raise ValueError
         if fid == EParseId.CMNINFO:
             self._recv_cb_cmninfo(fdata)
         elif fid == EParseId.CHINFO:
@@ -161,7 +152,7 @@ class ParseRecv(ICommParseRecv):
         elif fid == EParseId.DIV:
             self._recv_cb_div(fdata)
         else:
-            raise ValueError
+            raise AssertionError
 
     def frame_start_decode(self, data: bytes) -> bool:
         """Hecode start frame."""

@@ -157,8 +157,7 @@ class NxscopeHandler:
         else:
             assert isinstance(div, list)
             # divider list configuration must cover all configured channels
-            if len(div) != len(self._chanlist):
-                raise TypeError
+            assert len(div) == len(self._chanlist)
             for i, channel in enumerate(self._chanlist):
                 self.nxslib_ch_divider(channel.chan, div[i])
 
