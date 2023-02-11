@@ -14,13 +14,24 @@ if TYPE_CHECKING:
 class ThreadCommon:
     """A class that handle common thread logic."""
 
-    def __init__(self, target: "Callable[[], None]"):
+    def __init__(
+        self,
+        target: "Callable[[], None]",
+        init: "Callable[[], None] | None" = None,
+        final: "Callable[[], None] | None" = None,
+    ) -> None:
         """Initialize common thread.
 
         :param: callable object to be invoked
         """
         assert callable(target)
+        if init:
+            assert callable(init)
+        if final:
+            assert callable(final)
         self._target = target
+        self._init = init
+        self._final = final
         self._thrd: threading.Thread | None = None
         self._stop_flag = threading.Event()
 
@@ -33,8 +44,17 @@ class ThreadCommon:
         self._stop_flag.set()
 
     def _thread_loop(self) -> None:
+        # one time initialization
+        if self._init:
+            self._init()
+
+        # thread loop
         while not self._stop_is_set():
             self._target()
+
+        # final logic
+        if self._final:
+            self._final()
 
     def _stop_clear(self) -> None:
         """Clear stop flag."""
