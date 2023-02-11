@@ -70,6 +70,20 @@ def test_thread():
     thr.thread_stop()
     assert thr.thread_is_alive() is False
 
+    # start/stop many times
+    thr.thread_start()
+    assert thr.thread_is_alive() is True
+    thr.thread_start()
+    assert thr.thread_is_alive() is True
+    thr.thread_start()
+    assert thr.thread_is_alive() is True
+    thr.thread_stop()
+    assert thr.thread_is_alive() is False
+    thr.thread_stop()
+    assert thr.thread_is_alive() is False
+    thr.thread_stop()
+    assert thr.thread_is_alive() is False
+
 
 def test_thread_init_final():
     # invalid init type
@@ -111,5 +125,19 @@ def test_thread_init_final():
     # start and stop once again
     thr.thread_start()
     assert thr.thread_is_alive() is True
+    thr.thread_stop()
+    assert thr.thread_is_alive() is False
+
+    # start/stop many times
+    thr.thread_start()
+    assert thr.thread_is_alive() is True
+    thr.thread_start()
+    assert thr.thread_is_alive() is True
+    thr.thread_start()
+    assert thr.thread_is_alive() is True
+    thr.thread_stop()
+    assert thr.thread_is_alive() is False
+    thr.thread_stop()
+    assert thr.thread_is_alive() is False
     thr.thread_stop()
     assert thr.thread_is_alive() is False
