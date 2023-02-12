@@ -204,6 +204,9 @@ class NxscopeHandler:
         """Disconnect from a NxScope device."""
         if self._connected is True:
             assert self._comm
+            # stop stream
+            self.stream_stop()
+            # disconnect
             self._comm.disconnect()
 
     def nxslib_channels_default_cfg(self) -> None:
