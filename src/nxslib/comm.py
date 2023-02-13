@@ -49,7 +49,7 @@ class CommHandler:
         # started flag
         self._started = False
 
-        self._thrd = ThreadCommon(self._recv_thread)
+        self._thrd = ThreadCommon(self._recv_thread, name="recv")
 
         assert isinstance(intf, ICommInterface)
         assert isinstance(parse, ICommParse)
