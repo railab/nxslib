@@ -19,6 +19,7 @@ class ThreadCommon:
         target: "Callable[[], None]",
         init: "Callable[[], None] | None" = None,
         final: "Callable[[], None] | None" = None,
+        name: str | None = None,
     ) -> None:
         """Initialize common thread.
 
@@ -34,6 +35,7 @@ class ThreadCommon:
         self._final = final
         self._thrd: threading.Thread | None = None
         self._stop_flag = threading.Event()
+        self._name = name
 
     def _stop_is_set(self) -> bool:
         """Return stop flag state."""
@@ -85,5 +87,7 @@ class ThreadCommon:
         """Start thread."""
         if not self._thrd:
             self._stop_clear()
-            self._thrd = threading.Thread(target=self._thread_loop)
+            self._thrd = threading.Thread(
+                target=self._thread_loop, name=self._name
+            )
             self._thrd.start()

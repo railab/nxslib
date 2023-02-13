@@ -264,7 +264,7 @@ class DummyDev(ICommInterface):
     ) -> None:
         """Intitialize a dummy NxScope interface."""
         super().__init__()
-        self._thrd = ThreadCommon(self._thread)
+        self._thrd = ThreadCommon(self._thread, name="dummy")
 
         # default device
         if not channels:

@@ -27,7 +27,7 @@ class NxscopeHandler:
 
         self._chanlist: list["DeviceChannel"] = []
 
-        self._thrd = ThreadCommon(self._stream_thread)
+        self._thrd = ThreadCommon(self._stream_thread, name="stream")
 
         self._sub_q: list[list[queue.Queue[list[tuple]]]] = []
         self._queue_lock: Lock = Lock()
