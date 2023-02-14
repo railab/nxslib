@@ -1,5 +1,6 @@
 """Module containing the NxScope dummy interface implementation."""
 
+import math
 import queue
 import random
 import threading
@@ -137,7 +138,7 @@ class ChannelFunc6(IDeviceChannelFunc):
 
 
 class ChannelFunc7(IDeviceChannelFunc):
-    """Generate static data."""
+    """Generate static vector data."""
 
     _cntr = 0
 
@@ -154,7 +155,7 @@ class ChannelFunc7(IDeviceChannelFunc):
 
 
 class ChannelFunc8(IDeviceChannelFunc):
-    """Generate static data."""
+    """Generate hello message in meta data."""
 
     def reset(self) -> None:
         """Reset handler."""
@@ -164,6 +165,29 @@ class ChannelFunc8(IDeviceChannelFunc):
         data = ()
         meta = list(b"hello" + b"\x00" * 11)  # align to 16B
         return DDeviceChannelFuncData(data=data, meta=tuple(meta))
+
+
+class ChannelFunc9(IDeviceChannelFunc):
+    """Generate 3-phase sine wave."""
+
+    _cntr = 0
+
+    def reset(self) -> None:
+        """Reset handler."""
+        self._cntr = 0
+
+    def get(self, _: int) -> DDeviceChannelFuncData:
+        """Get sample data."""
+        x = 2 * math.pi * self._cntr / 500
+        data = (
+            math.sin(x),
+            math.sin(x + (2 * math.pi / 3)),
+            math.sin(x + (4 * math.pi / 3)),
+        )
+        self._cntr += 1
+        self._cntr %= 500
+
+        return DDeviceChannelFuncData(data=data)
 
 
 DUMMY_DEV_CHANNELS = [
@@ -234,6 +258,13 @@ DUMMY_DEV_CHANNELS = [
     ),
     DeviceChannel(
         9,
+        EDeviceChannelType.FLOAT.value,
+        3,
+        "chan9",
+        func=ChannelFunc9(),
+    ),
+    DeviceChannel(
+        10,
         EDeviceChannelType.UNDEF.value,
         0,
         "",
