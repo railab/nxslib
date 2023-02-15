@@ -384,7 +384,14 @@ class CommHandler:
 
     def disconnect(self) -> None:
         """Disconnect from a nxslib device."""
-        self._stop()
+        try:
+            # TODO: revisit.
+            # This is a dirty fix for occasional RuntimeError in
+            # thread.thread_stop(). I wasn't able to find the real cause
+            # of this problem.
+            self._stop()
+        except RuntimeError: # pragma: no cover
+            pass
 
     def flags_is_overflow(self, flag: int) -> bool:
         """Return stream OVERFLOW flag state.
