@@ -71,8 +71,9 @@ class CommHandler:
         self.disconnect()
 
     def _drop_all(self) -> None:
-        """Drop all frames from the interface."""
+        """Drop all frames."""
         self._intf.drop_all()
+        self._drop_all_frames()
 
     def _recv_thread(self) -> None:
         """Recv thread."""
@@ -206,11 +207,8 @@ class CommHandler:
             # trigger RX with dummy data write
             self._intf.write(b"\x00" * frame.rxpadding)
 
-        # drop all frames from the interface
-        self._intf.drop_all()
-
-        # drop all frames from queue
-        self._drop_all_frames()
+        # drop all frames
+        self._drop_all()
 
         # get channels info
         channels: list[DeviceChannel] = []
@@ -238,9 +236,6 @@ class CommHandler:
 
             # stop intf
             self._intf.stop()
-
-            # drop all frames from the interface
-            self._intf.drop_all()
 
             # drop all pending data
             self._drop_all()
