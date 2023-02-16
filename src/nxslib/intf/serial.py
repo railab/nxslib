@@ -54,11 +54,15 @@ class SerialDevice(ICommInterface):
     def drop_all(self) -> None:
         """Drop all frames."""
         for _ in range(10):
-            self._ser.read(self._ser.in_waiting)
+            self._read()
 
     def _read(self) -> bytes:
         """Interface specific read method."""
-        return self._ser.read(self._ser.in_waiting)
+        try:
+            return self._ser.read(self._ser.in_waiting)
+        except serial.SerialException as e:
+            logger.debug("SerialException ignored:", str(e))
+            return b""
 
     def _write(self, data: bytes) -> None:
         """Interface specific write method.
