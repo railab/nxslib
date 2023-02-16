@@ -185,7 +185,7 @@ class DeviceChannel(DDeviceChannelData):
             assert isinstance(func, IDeviceChannelFunc)
 
         # force name to be string
-        if self.name is None:
+        if not self.name:
             self.name = ""
 
         self._func = func
