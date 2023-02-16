@@ -242,7 +242,7 @@ class Parser(ICommParse):
             chinfo_decode, frame.data
         )
 
-        name = "" if _str else _str.decode().split("\x00")[0]
+        name = "" if not _str else _str.decode().split("\x00")[0]
 
         return DeviceChannel(
             chan=chan,
