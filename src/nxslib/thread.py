@@ -41,10 +41,6 @@ class ThreadCommon:
         """Return stop flag state."""
         return self._stop_flag.is_set()
 
-    def _stop_set(self) -> None:
-        """Set stop flag."""
-        self._stop_flag.set()
-
     def _thread_loop(self) -> None:
         # one time initialization
         if self._init:
@@ -62,6 +58,10 @@ class ThreadCommon:
         """Clear stop flag."""
         self._stop_flag.clear()
 
+    def stop_set(self) -> None:
+        """Set stop flag."""
+        self._stop_flag.set()
+
     def thread_is_alive(self) -> bool:
         """Return true is thread is alive."""
         if self._thrd is None:
@@ -75,7 +75,7 @@ class ThreadCommon:
             return
 
         # stop request for thread
-        self._stop_set()
+        self.stop_set()
 
         # wait for thread
         if self.thread_is_alive():  # pragma: no cover
