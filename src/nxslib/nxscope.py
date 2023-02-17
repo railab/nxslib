@@ -2,8 +2,9 @@
 
 import queue
 import time
+from dataclasses import dataclass
 from threading import Lock
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from nxslib.logger import logger
 from nxslib.thread import ThreadCommon
@@ -12,6 +13,20 @@ if TYPE_CHECKING:
     from nxslib.comm import CommHandler
     from nxslib.dev import Device, DeviceChannel
     from nxslib.proto.iparse import DParseStream
+
+
+###############################################################################
+# Data: DNxscopeStream
+###############################################################################
+
+
+@dataclass
+class DNxscopeStream:
+    """Stream data item."""
+
+    data: tuple[Any, ...]
+    meta: tuple[Any, ...]
+
 
 ###############################################################################
 # Class: NxscopeHandler
@@ -95,7 +110,7 @@ class NxscopeHandler:
                 logger.info("stream flags: OVERFLOW!")
                 self._ovf_cntr += 1
 
-            samples: list[list[tuple]]
+            samples: list[list[DNxscopeStream]]
             samples = [[] for _ in range(chmax)]
 
             for data in stream:
@@ -104,7 +119,7 @@ class NxscopeHandler:
                 meta = data.meta
                 # channel enabled
                 if self._comm.ch_is_enabled(chan) is True:  # pragma: no cover
-                    samples[chan].append((val, meta))
+                    samples[chan].append(DNxscopeStream(val, meta))
 
             with self._queue_lock:
                 # send all samples at once
