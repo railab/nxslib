@@ -77,7 +77,7 @@ class DDeviceData:
     chmax: int
     flags: int
     rxpadding: int
-    channels: list
+    channels: list["DeviceChannel"]
 
 
 ###############################################################################

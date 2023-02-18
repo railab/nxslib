@@ -1,6 +1,7 @@
 """Module containing the NxScope data parser."""
 
 import struct
+from typing import Any
 
 from nxslib.dev import Device, DeviceChannel
 from nxslib.proto.iframe import DParseFrame, EParseId, ICommFrame
@@ -64,7 +65,9 @@ class Parser(ICommParse):
         _bytes += data
         return self._frame.frame_create(_id, _bytes)
 
-    def _stream_data_get(self, decode: DsfmtItem, unpacked: tuple) -> tuple:
+    def _stream_data_get(
+        self, decode: DsfmtItem, unpacked: tuple[Any, ...]
+    ) -> tuple[Any, ...]:
         if decode.dtype == EParseDataType.NUM and decode.scale:
             # scale numerical data if scaling factor available
             retdata = tuple(x / decode.scale for x in unpacked)
@@ -98,7 +101,9 @@ class Parser(ICommParse):
         _bytes = struct.pack("b", chan)
         return self._frame.frame_create(EParseId.CHINFO, _bytes)
 
-    def frame_enable(self, enable: tuple | list, chmax: int) -> bytes:
+    def frame_enable(
+        self, enable: tuple[int, bool] | list[bool], chmax: int
+    ) -> bytes:
         """Create a enable frame."""
         # single channel change
         if isinstance(enable, tuple) is True:
@@ -110,7 +115,7 @@ class Parser(ICommParse):
 
         # all the same
         if len(enable) == chmax and len(set(enable)) <= 1:
-            data = bytes([bool(enable[0])])
+            data = bytes([enable[0]])
             return self._frame_set_all(EParseId.ENABLE, data)
 
         # bulk request for all channels
@@ -125,7 +130,7 @@ class Parser(ICommParse):
 
         return self._frame_set_bulk(EParseId.ENABLE, data)
 
-    def frame_div(self, div: tuple | list, chmax: int) -> bytes:
+    def frame_div(self, div: tuple[int, int] | list[int], chmax: int) -> bytes:
         """Create a div frame."""
         # single channel change
         if isinstance(div, tuple) is True:

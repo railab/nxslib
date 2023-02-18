@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from nxslib.proto.serialframe import SerialFrame
 
@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
     from nxslib.dev import Device, DeviceChannel
     from nxslib.proto.iframe import ICommFrame
+    from nxslib.proto.iparse import DParseStreamData
 
 ###############################################################################
 # Class: ParseRecvCb
@@ -49,15 +50,15 @@ class ICommParseRecv(ABC):
         """Decode start frame."""
 
     @abstractmethod
-    def frame_set_decode(self, data: bytes) -> tuple:
+    def frame_set_decode(self, data: bytes) -> tuple[Any, ...]:
         """Decode set type frame."""
 
     @abstractmethod
-    def frame_enable_decode(self, data: bytes, dev: "Device") -> list:
+    def frame_enable_decode(self, data: bytes, dev: "Device") -> list[bool]:
         """Decode enable frame."""
 
     @abstractmethod
-    def frame_div_decode(self, data: bytes, dev: "Device") -> list:
+    def frame_div_decode(self, data: bytes, dev: "Device") -> list[int]:
         """Decode divider frame."""
 
     @abstractmethod
@@ -69,7 +70,9 @@ class ICommParseRecv(ABC):
         """Encode channel info frame."""
 
     @abstractmethod
-    def frame_stream_encode(self, data: list) -> bytes | None:
+    def frame_stream_encode(
+        self, data: list["DParseStreamData"]
+    ) -> bytes | None:
         """Encode stream data frame."""
 
     @abstractmethod

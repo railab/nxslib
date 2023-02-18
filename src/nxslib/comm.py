@@ -268,7 +268,9 @@ class CommHandler:
             self._started = True
 
     # TODO: use decorator to handle ack responses
-    def _channel_enable(self, enable: tuple | list) -> ParseAck:
+    def _channel_enable(
+        self, enable: tuple[int, bool] | list[bool]
+    ) -> ParseAck:
         """Channel enable."""
         assert self.dev
 
@@ -278,7 +280,7 @@ class CommHandler:
         ack = self._get_ack(timeout=1.0)
         return ack
 
-    def _channel_div(self, div: tuple | list) -> ParseAck:
+    def _channel_div(self, div: tuple[int, int] | list[int]) -> ParseAck:
         """Channel divider."""
         assert self.dev
 
@@ -451,7 +453,7 @@ class CommHandler:
         assert self.dev
         self.stream_channels_init(self.dev)
 
-    def ch_enable(self, chans: list | int) -> None:
+    def ch_enable(self, chans: list[int] | int) -> None:
         """Enable specific channel.
 
         :param chans: single channel ID or a list with channels IDs
@@ -465,7 +467,7 @@ class CommHandler:
         else:
             raise TypeError
 
-    def ch_disable(self, chans: list | int) -> None:
+    def ch_disable(self, chans: list[int] | int) -> None:
         """Disable specific channel.
 
         :param chans: single channel ID or a list with channels IDs
@@ -479,7 +481,7 @@ class CommHandler:
         else:
             raise TypeError
 
-    def ch_divider(self, chans: list | int, div: int) -> None:
+    def ch_divider(self, chans: list[int] | int, div: int) -> None:
         """Set channel divider.
 
         :param chans: single channel ID or a list with channels IDs
