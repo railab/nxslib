@@ -11,11 +11,12 @@ Compatible with Python 3.10+.
 * built-in simulated _NxScope_ device that allows application development without 
 connecting a real NuttX device
 * support for the _NxScope_ serial protocol
-
-## Features Planned
-* run-time channels configuration
+* user-specific stream data decoding (user-defined types)
+* support for custom protocols
 
 ## Instalation
+
+For now, only installation from sources is available.
 
 To install _Nxslib_ locally from this repository use:
 
@@ -23,26 +24,13 @@ To install _Nxslib_ locally from this repository use:
 
 ## Contributing
 
-#### Setting up for development
+All contributions are welcome to this project. 
 
-1. Clone the repository.
+To get started with developing _Nxslib_, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-2. Create a new venv and activate it
+## Usage
 
-```
-virtualenv venv
-. venv/bin/activate
-```
+Look at [docs/usage](docs/usage.rst).
 
-3. Install _Nxslib_ in editable mode
-
-`pip install -e .`
-
-and now you are ready to modify the code.
-
-#### CI
-
-Please run `tox` before submitting a patch to be sure your changes will pass CI.
-
-## Used by
-* [Nxscli](https://github.com/railab/nxscli/)
+## Tools
+* [Nxscli](https://github.com/railab/nxscli/) - the command-line interface based on _Nxslib_

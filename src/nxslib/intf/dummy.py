@@ -293,7 +293,15 @@ class DummyDev(ICommInterface):
         stream_sleep: float = 0.001,
         stream_snum: int = 100,
     ) -> None:
-        """Intitialize a dummy NxScope interface."""
+        """Intitialize a dummy NxScope interface.
+
+        :param chmax: the number of supported channels
+        :param flags: the device flags
+        :param channels: a device channels list
+        :param rxpadding: rxpadding - doesn't matter here
+        :param stream_sleep: samples thread parameter
+        :param stream_snum: samples thread parameter
+        """
         super().__init__()
         self._thrd_stream = ThreadCommon(
             self._thread_stream, name="dummy_stream"
