@@ -109,8 +109,8 @@ def test_nxslib_stream():
     nxslib.stream_stop()
 
     # unsub from streams
-    nxslib.stream_unsub(0, q0_0)
-    nxslib.stream_unsub(0, q0_1)
+    nxslib.stream_unsub(q0_0)
+    nxslib.stream_unsub(q0_1)
 
     # configure channels
     nxslib.channels_default_cfg()
