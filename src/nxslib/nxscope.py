@@ -325,14 +325,15 @@ class NxscopeHandler:
 
         return subq
 
-    def stream_unsub(self, chan: int, subq: queue.Queue) -> None:
+    def stream_unsub(self, subq: queue.Queue) -> None:
         """Unsubscribe from a given channel.
 
-        :param chid: the channel ID
         :param subq: the queue instance that was used with the channel
         """
         with self._queue_lock:
-            self._sub_q[chan].remove(subq)
+            for i, sub in enumerate(self._sub_q):
+                if subq in sub:
+                    self._sub_q[i].remove(subq)
 
     def channels_configure(
         self, channels: list[int], div: int | list[int] = 0
