@@ -91,7 +91,7 @@ class DParseStream:
     """Nxslib stream data."""
 
     flags: int
-    samples: list
+    samples: list[DParseStreamData]
 
 
 ###############################################################################
@@ -147,7 +147,9 @@ def msfmt_get(mlen: int) -> str:
 ###############################################################################
 
 
-def dsfmt_get(dtype: int, user: dict | None = None) -> DsfmtItem:
+def dsfmt_get(
+    dtype: int, user: dict[int, DsfmtItem] | None = None
+) -> DsfmtItem:
     """Get data format."""
     # tuple of (size in bytes, unpack fmt, scale factor)
     dsfmt_dict = {
@@ -317,11 +319,13 @@ class ICommParse(ABC):
         """Create a chinfo frame."""
 
     @abstractmethod
-    def frame_enable(self, enable: tuple | list, chmax: int) -> bytes:
+    def frame_enable(
+        self, enable: tuple[int, bool] | list[bool], chmax: int
+    ) -> bytes:
         """Create a enable frame."""
 
     @abstractmethod
-    def frame_div(self, div: tuple | list, chmax: int) -> bytes:
+    def frame_div(self, div: tuple[int, int] | list[int], chmax: int) -> bytes:
         """Create a div frame."""
 
     @abstractmethod

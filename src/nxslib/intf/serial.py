@@ -58,8 +58,9 @@ class SerialDevice(ICommInterface):
 
     def _read(self) -> bytes:
         """Interface specific read method."""
+        assert self._ser
         try:
-            return self._ser.read(self._ser.in_waiting)
+            return self._ser.read(self._ser.in_waiting)  # type: ignore
         except serial.SerialException as e:
             logger.debug("SerialException ignored:", str(e))
             return b""
@@ -69,4 +70,5 @@ class SerialDevice(ICommInterface):
 
         :param data: bytes to send
         """
+        assert self._ser
         self._ser.write(data)

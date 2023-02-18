@@ -52,7 +52,7 @@ class NxscopeHandler:
 
         self._thrd = ThreadCommon(self._stream_thread, name="stream")
 
-        self._sub_q: list[list[queue.Queue[list[tuple]]]] = []
+        self._sub_q: list[list[queue.Queue[list[DNxscopeStream]]]] = []
         self._queue_lock: Lock = Lock()
 
         self._stream_started: bool = False
@@ -241,7 +241,7 @@ class NxscopeHandler:
         assert self._comm
         self._comm.channels_default_cfg()
 
-    def ch_enable(self, chans: list | int) -> None:
+    def ch_enable(self, chans: list[int] | int) -> None:
         """Enable a given channels.
 
         The effects of this method are buffered and will
@@ -252,7 +252,7 @@ class NxscopeHandler:
         assert self._comm
         self._comm.ch_enable(chans)
 
-    def ch_divider(self, chans: list | int, div: int) -> None:
+    def ch_divider(self, chans: list[int] | int, div: int) -> None:
         """Configure divider for a given channels.
 
         The effects of this method are buffered and will
@@ -313,19 +313,19 @@ class NxscopeHandler:
 
             self._stream_started = False
 
-    def stream_sub(self, chan: int) -> queue.Queue:
+    def stream_sub(self, chan: int) -> queue.Queue[list[DNxscopeStream]]:
         """Subscribe to a given channel.
 
         :param chid: the channel ID
         """
-        subq: queue.Queue[list[tuple]] = queue.Queue()
+        subq: queue.Queue[list[DNxscopeStream]] = queue.Queue()
 
         with self._queue_lock:
             self._sub_q[chan].append(subq)
 
         return subq
 
-    def stream_unsub(self, subq: queue.Queue) -> None:
+    def stream_unsub(self, subq: queue.Queue[list[DNxscopeStream]]) -> None:
         """Unsubscribe from a given channel.
 
         :param subq: the queue instance that was used with the channel

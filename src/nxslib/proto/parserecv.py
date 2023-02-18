@@ -1,12 +1,18 @@
 """Module containing the NxScope receiver protocol logic."""
 
 import struct
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from nxslib.proto.iframe import EParseError, EParseId, ICommFrame
-from nxslib.proto.iparse import DParseStreamData, DsfmtItem, EParseDataType
+from nxslib.proto.iparse import (
+    DParseStreamData,
+    DsfmtItem,
+    EParseDataType,
+    EParseIdSetFlags,
+    dsfmt_get,
+    msfmt_get,
+)
 from nxslib.proto.iparserecv import ICommParseRecv, ParseRecvCb
-from nxslib.proto.parse import EParseIdSetFlags, dsfmt_get, msfmt_get
 from nxslib.proto.serialframe import SerialFrame
 
 if TYPE_CHECKING:
@@ -177,11 +183,11 @@ class ParseRecv(ICommParseRecv):
         else:
             raise AssertionError
 
-    def frame_start_decode(self, data: bytes) -> bool:
+    def frame_start_decode(self, data: bytes) -> Any:
         """Hecode start frame."""
         return struct.unpack("?", data[0:1])[0]
 
-    def frame_set_decode(self, data: bytes) -> tuple:
+    def frame_set_decode(self, data: bytes) -> tuple[Any, ...]:
         """Decode set type frame."""
         return struct.unpack("BB", data)
 
@@ -207,7 +213,7 @@ class ParseRecv(ICommParseRecv):
 
         return ret
 
-    def frame_div_decode(self, data: bytes, dev: "Device") -> list:
+    def frame_div_decode(self, data: bytes, dev: "Device") -> list[int]:
         """Decode divider frame."""
         # decode set frame
         flags, chan = self.frame_set_decode(data[:2])
