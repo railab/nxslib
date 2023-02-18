@@ -7,6 +7,7 @@ from nxslib.proto.iframe import DParseFrame, EParseId, ICommFrame
 from nxslib.proto.iparse import (
     DParseStream,
     DParseStreamData,
+    DsfmtItem,
     EParseDataType,
     EParseIdSetFlags,
     ICommParse,
@@ -25,12 +26,17 @@ from nxslib.proto.serialframe import SerialFrame
 class Parser(ICommParse):
     """A class used to a represent NxScope parser."""
 
-    def __init__(self, frame: type[ICommFrame] = SerialFrame):
+    def __init__(
+        self,
+        frame: type[ICommFrame] = SerialFrame,
+        user_types: dict[int, DsfmtItem] | None = None,
+    ) -> None:
         """Initialize the Nxslib parser.
 
         :param frame: instance of the frame parser
         """
         self._frame = frame()
+        self._user_types = user_types
 
     def _frame_set_data(self, flags: int, chan: int = 0) -> bytes:
         return struct.pack("BB", flags, chan)
@@ -57,6 +63,21 @@ class Parser(ICommParse):
         _bytes = self._frame_set_data(EParseIdSetFlags.ALL)
         _bytes += data
         return self._frame.frame_create(_id, _bytes)
+
+    def _stream_data_get(self, decode: DsfmtItem, unpacked: tuple) -> tuple:
+        if decode.dtype == EParseDataType.NUM and decode.scale:
+            # scale numerical data if scaling factor available
+            retdata = tuple(x / decode.scale for x in unpacked)
+
+        elif decode.dtype is EParseDataType.CHAR and len(unpacked) == 1:
+            # decode bytes to string if possible
+            retdata = (unpacked[0].decode(),)
+
+        else:
+            # otherwise return without formating
+            retdata = unpacked
+
+        return retdata
 
     @property
     def frame(self) -> ICommFrame:
@@ -156,43 +177,36 @@ class Parser(ICommParse):
             meta = msfmt_get(chan.mlen)
 
             # decode sample type
-            slen, dsfmt, scale, dtype = dsfmt_get(chan.dtype)
+            decode = dsfmt_get(chan.dtype, self._user_types)
+            if decode.user:  # pragma: no cover
+                # NxScope compatibility:
+                #   real type size is determined with vdim, not by slen
+                assert struct.calcsize("<" + decode.dsfmt) == chan.vdim
 
             # data always packed as little-endian
-            if chan.vdim:
-                sfmt = "<" + str(chan.vdim) + dsfmt + meta
-            else:
-                sfmt = "<" + meta
+            sfmt = "<"
+            if chan.vdim and not decode.user:
+                sfmt += str(chan.vdim)
+            sfmt += decode.dsfmt
 
             # unpack data
-            offset = slen * chan.vdim + chan.mlen
-
+            offset = decode.slen * chan.vdim
             unpacked = struct.unpack(sfmt, frame.data[i : i + offset])
             i += offset
 
-            # TODO: refactor
-            assert dtype in EParseDataType
-            if dtype == EParseDataType.NUM:
-                # scale data
-                retdata = tuple(x / scale for x in unpacked[: chan.vdim])
-                mdata = unpacked[chan.vdim :]
-            elif dtype is EParseDataType.NONE:
-                retdata = ()
-                mdata = unpacked
-            else:
-                assert dtype == EParseDataType.CHAR
-                retbytes = unpacked[0]
-                # decode bytes to char
-                retdata = (retbytes.decode(),)
-                if chan.mlen > 0:
-                    mdata = (unpacked[1],)
-                else:
-                    mdata = ()
+            # format stream data
+            retdata = self._stream_data_get(decode, unpacked)
+
+            # unpack metadata
+            sfmt = "<" + meta
+            offset = chan.mlen
+            mdata = struct.unpack(sfmt, frame.data[i : i + offset])
+            i += offset
 
             # sample
             sample = DParseStreamData(
                 chan=chan.chan,
-                dtype=dtype,
+                dtype=decode.dtype,
                 vdim=chan.vdim,
                 mlen=chan.mlen,
                 data=retdata,

@@ -1,6 +1,6 @@
 from nxslib.dev import Device, DeviceChannel, EDeviceChannelType
 from nxslib.proto.iframe import DParseFrame, EParseId, ICommFrame
-from nxslib.proto.iparse import EParseDataType
+from nxslib.proto.iparse import DsfmtItem, EParseDataType
 from nxslib.proto.parse import Parser
 
 
@@ -172,3 +172,98 @@ def test_nxslibparse_stream():
     assert sdata.samples[0].mlen == 0
     assert sdata.samples[0].data == ("a\x00",)
     assert sdata.samples[0].meta == ()
+
+
+def test_nxslibparse_stream_user():
+    user = {
+        EDeviceChannelType.USER1.value: DsfmtItem(
+            1, "iiii", None, EParseDataType.NUM, None, True
+        ),
+        EDeviceChannelType.USER2.value: DsfmtItem(
+            1, "ccc", None, EParseDataType.CHAR, None, True
+        ),
+        EDeviceChannelType.USER3.value: DsfmtItem(
+            1,
+            "ccii",
+            None,
+            EParseDataType.COMPLEX,
+            [
+                EParseDataType.CHAR,
+                EParseDataType.CHAR,
+                EParseDataType.NUM,
+                EParseDataType.NUM,
+            ],
+            True,
+        ),
+    }
+    parse = Parser(user_types=user)
+    chans = [
+        DeviceChannel(
+            0, EDeviceChannelType.USER1.value, 16, "chan0", mlen=0, func=None
+        ),
+        DeviceChannel(
+            1,
+            EDeviceChannelType.USER2.value,
+            3,
+            "chan1",
+            mlen=0,
+            func=None,
+        ),
+        DeviceChannel(
+            2, EDeviceChannelType.USER3.value, 10, "chan3", mlen=0, func=None
+        ),
+        DeviceChannel(
+            3, EDeviceChannelType.USER3.value, 10, "chan2", mlen=1, func=None
+        ),
+    ]
+    d = Device(4, 0b11, 0, chans)
+
+    # chan 0 sample
+
+    data = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+    data += b"\x00\x00\x00\x00"
+    frame = DParseFrame(EParseId.STREAM, data)
+    sdata = parse.frame_stream_decode(frame, d)
+    assert sdata.flags == 0
+    assert sdata.samples[0].chan == 0
+    assert sdata.samples[0].dtype == EParseDataType.NUM
+    assert sdata.samples[0].vdim == 16
+    assert sdata.samples[0].mlen == 0
+    assert sdata.samples[0].data == (0, 0, 0, 0)
+    assert sdata.samples[0].meta == ()
+
+    # chan 1 sample
+    data = b"\x00\x01abc"
+    frame = DParseFrame(EParseId.STREAM, data)
+    sdata = parse.frame_stream_decode(frame, d)
+    assert sdata.flags == 0
+    assert sdata.samples[0].chan == 1
+    assert sdata.samples[0].dtype == EParseDataType.CHAR
+    assert sdata.samples[0].vdim == 3
+    assert sdata.samples[0].mlen == 0
+    assert sdata.samples[0].data == (b"a", b"b", b"c")
+    assert sdata.samples[0].meta == ()
+
+    # chan 2 sample
+    data = b"\x00\x02ab\x00\x00\x00\x00\x00\x00\x00\x00"
+    frame = DParseFrame(EParseId.STREAM, data)
+    sdata = parse.frame_stream_decode(frame, d)
+    assert sdata.flags == 0
+    assert sdata.samples[0].chan == 2
+    assert sdata.samples[0].dtype == EParseDataType.COMPLEX
+    assert sdata.samples[0].vdim == 10
+    assert sdata.samples[0].mlen == 0
+    assert sdata.samples[0].data == (b"a", b"b", 0, 0)
+    assert sdata.samples[0].meta == ()
+
+    # chan 3 sample
+    data = b"\x00\x03ab\x00\x00\x00\x00\x00\x00\x00\x00\x01"
+    frame = DParseFrame(EParseId.STREAM, data)
+    sdata = parse.frame_stream_decode(frame, d)
+    assert sdata.flags == 0
+    assert sdata.samples[0].chan == 3
+    assert sdata.samples[0].dtype == EParseDataType.COMPLEX
+    assert sdata.samples[0].vdim == 10
+    assert sdata.samples[0].mlen == 1
+    assert sdata.samples[0].data == (b"a", b"b", 0, 0)
+    assert sdata.samples[0].meta == (1,)

@@ -35,10 +35,21 @@ class EDeviceChannelType(Enum):
     WCHAR = 19
 
     # user specific types starts from here
-    USER = 20
 
-    # max possible
-    LAST = 31
+    USER1 = 20
+    USER2 = 21
+    USER3 = 22
+    USER4 = 23
+    USER5 = 24
+    USER6 = 25
+    USER7 = 26
+    USER8 = 27
+    USER9 = 28
+    USER10 = 29
+    USER11 = 30
+    USER12 = 31
+
+    # max possible = 31
 
 
 ###############################################################################

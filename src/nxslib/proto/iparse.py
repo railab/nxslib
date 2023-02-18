@@ -95,6 +95,37 @@ class DParseStream:
 
 
 ###############################################################################
+# Enum: EParseDataType
+###############################################################################
+
+
+class EParseDataType(IntEnum):
+    """Nxslib parse data type."""
+
+    NONE = 0
+    NUM = 1
+    CHAR = 2
+    COMPLEX = 3
+
+
+###############################################################################
+# Data: DsfmtItem
+###############################################################################
+
+
+@dataclass
+class DsfmtItem:
+    """Stream data format."""
+
+    slen: int
+    dsfmt: str
+    scale: float | int | None
+    dtype: EParseDataType
+    cdecode: tuple[EParseDataType] | None = None
+    user: bool = False
+
+
+###############################################################################
 # Function: msfmt_get
 ###############################################################################
 
@@ -112,136 +143,123 @@ def msfmt_get(mlen: int) -> str:
 
 
 ###############################################################################
-# Enum: EParseDataType
-###############################################################################
-
-
-class EParseDataType(IntEnum):
-    """Nxslib parse data type."""
-
-    NONE = 0
-    NUM = 1
-    CHAR = 2
-
-
-###############################################################################
 # Function: dsfmt_get
 ###############################################################################
 
 
-def dsfmt_get(dtype: int) -> tuple:
+def dsfmt_get(dtype: int, user: dict | None = None) -> DsfmtItem:
     """Get data format."""
     # tuple of (size in bytes, unpack fmt, scale factor)
     dsfmt_dict = {
-        EDeviceChannelType.NONE.value: (
+        EDeviceChannelType.NONE.value: DsfmtItem(
             0,
             "",
             None,
             EParseDataType.NONE,
         ),
-        EDeviceChannelType.UINT8.value: (
+        EDeviceChannelType.UINT8.value: DsfmtItem(
             1,
             "B",
             1,
             EParseDataType.NUM,
         ),
-        EDeviceChannelType.INT8.value: (
+        EDeviceChannelType.INT8.value: DsfmtItem(
             1,
             "b",
             1,
             EParseDataType.NUM,
         ),
-        EDeviceChannelType.UINT16.value: (
+        EDeviceChannelType.UINT16.value: DsfmtItem(
             2,
             "H",
             1,
             EParseDataType.NUM,
         ),
-        EDeviceChannelType.INT16.value: (
+        EDeviceChannelType.INT16.value: DsfmtItem(
             2,
             "h",
             1,
             EParseDataType.NUM,
         ),
-        EDeviceChannelType.UINT32.value: (
+        EDeviceChannelType.UINT32.value: DsfmtItem(
             4,
             "I",
             1,
             EParseDataType.NUM,
         ),
-        EDeviceChannelType.INT32.value: (
+        EDeviceChannelType.INT32.value: DsfmtItem(
             4,
             "i",
             1,
             EParseDataType.NUM,
         ),
-        EDeviceChannelType.UINT64.value: (
+        EDeviceChannelType.UINT64.value: DsfmtItem(
             8,
             "Q",
             1,
             EParseDataType.NUM,
         ),
-        EDeviceChannelType.INT64.value: (
+        EDeviceChannelType.INT64.value: DsfmtItem(
             8,
             "q",
             1,
             EParseDataType.NUM,
         ),
-        EDeviceChannelType.FLOAT.value: (
+        EDeviceChannelType.FLOAT.value: DsfmtItem(
             4,
             "f",
             1.0,
             EParseDataType.NUM,
         ),
-        EDeviceChannelType.DOUBLE.value: (
+        EDeviceChannelType.DOUBLE.value: DsfmtItem(
             8,
             "d",
             1.0,
             EParseDataType.NUM,
         ),
-        EDeviceChannelType.UB8.value: (
+        EDeviceChannelType.UB8.value: DsfmtItem(
             2,
             "H",
             256.0,
             EParseDataType.NUM,
         ),
-        EDeviceChannelType.B8.value: (
+        EDeviceChannelType.B8.value: DsfmtItem(
             2,
             "h",
             256.0,
             EParseDataType.NUM,
         ),
-        EDeviceChannelType.UB16.value: (
+        EDeviceChannelType.UB16.value: DsfmtItem(
             4,
             "I",
             65536.0,
             EParseDataType.NUM,
         ),
-        EDeviceChannelType.B16.value: (
+        EDeviceChannelType.B16.value: DsfmtItem(
             4,
             "i",
             65536.0,
             EParseDataType.NUM,
         ),
-        EDeviceChannelType.UB32.value: (
+        EDeviceChannelType.UB32.value: DsfmtItem(
             8,
             "Q",
             4294967296.0,
             EParseDataType.NUM,
         ),
-        EDeviceChannelType.B32.value: (
+        EDeviceChannelType.B32.value: DsfmtItem(
             8,
             "q",
             4294967296.0,
             EParseDataType.NUM,
         ),
-        EDeviceChannelType.CHAR.value: (
+        EDeviceChannelType.CHAR.value: DsfmtItem(
             1,
             "s",
             None,
             EParseDataType.CHAR,
         ),
-        EDeviceChannelType.WCHAR.value: (
+        EDeviceChannelType.WCHAR.value: DsfmtItem(
             1,
             "s",
             None,
@@ -250,6 +268,23 @@ def dsfmt_get(dtype: int) -> tuple:
     }
 
     dsfmt = dsfmt_dict.get(dtype)
+    if not dsfmt:
+        # try from user specific types
+        if user:
+            dsfmt = user.get(dtype)
+            if dsfmt:
+                # NxScope compatibility:
+                #   user specific type must have size == 1
+                #   real type size is determined with vdim
+                assert dsfmt.slen == 1
+                # user flag must be set
+                assert dsfmt.user is True
+                # scale is not supported
+                assert dsfmt.scale is None
+                # cdecode must be specified for complex type
+                if dsfmt.dtype == EParseDataType.COMPLEX:
+                    assert dsfmt.cdecode is not None
+
     if not dsfmt:
         raise KeyError
 
