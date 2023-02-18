@@ -4,7 +4,7 @@ import struct
 from typing import TYPE_CHECKING
 
 from nxslib.proto.iframe import EParseError, EParseId, ICommFrame
-from nxslib.proto.iparse import DParseStreamData, EParseDataType
+from nxslib.proto.iparse import DParseStreamData, DsfmtItem, EParseDataType
 from nxslib.proto.iparserecv import ICommParseRecv, ParseRecvCb
 from nxslib.proto.parse import EParseIdSetFlags, dsfmt_get, msfmt_get
 from nxslib.proto.serialframe import SerialFrame
@@ -24,6 +24,7 @@ class ParseRecv(ICommParseRecv):
         self,
         cb: ParseRecvCb,
         frame: type[ICommFrame] = SerialFrame,
+        user_types: dict[int, DsfmtItem] | None = None,
     ):
         """Initialize the receiver side parser.
 
@@ -33,6 +34,7 @@ class ParseRecv(ICommParseRecv):
         assert isinstance(cb, ParseRecvCb)
         self._recv_cb = cb
         self._frame = frame()
+        self._user_types = user_types
 
     def _cmninfo_data_encode(self, dev: "Device") -> bytes:
         """Encode cmninfo frame data."""
@@ -61,6 +63,41 @@ class ParseRecv(ICommParseRecv):
 
         return _bytes
 
+    def _stream_bytes_get(
+        self, decode: DsfmtItem, sample: DParseStreamData
+    ) -> bytes:
+        # pack data - always as little-endian
+        fmt = "<" + "b"
+        if sample.vdim:
+            if not decode.user:
+                fmt += str(sample.vdim) + decode.dsfmt
+            else:
+                # NxScope compatibility:
+                #   ignore vdim and use format string only
+                fmt += decode.dsfmt
+
+        if decode.dtype == EParseDataType.NUM:
+            if decode.scale:
+                # scale numeric data
+                vect_scale_l = [x * decode.scale for x in sample.data]
+            else:
+                # not scaled
+                vect_scale_l = [x for x in sample.data]
+            print(fmt, vect_scale_l)
+            _bytes = struct.pack(fmt, sample.chan, *vect_scale_l)
+        elif decode.dtype == EParseDataType.CHAR:
+            # string data
+            vect_scale_t = (bytes(sample.data[0], "utf"),)
+            _bytes = struct.pack(fmt, sample.chan, *vect_scale_t)
+        elif decode.dtype is EParseDataType.NONE:
+            # no data - encode channel num
+            _bytes = struct.pack(fmt, sample.chan)
+        else:
+            assert decode.dtype is EParseDataType.COMPLEX
+            _bytes = struct.pack(fmt, sample.chan, *sample.data)
+
+        return _bytes
+
     def _stream_data_encode(
         self, data: list[DParseStreamData]
     ) -> bytes | None:
@@ -82,27 +119,13 @@ class ParseRecv(ICommParseRecv):
             cntr += 1
 
             # sample format
-            _, dsfmt, scale, dtype = dsfmt_get(sample.dtype)
+            decode = dsfmt_get(sample.dtype, self._user_types)
 
             # meta format
             msfmt = msfmt_get(sample.mlen)
 
-            # pack data - always as little-endian
-            fmt = "<" + "b"
-            if sample.vdim:
-                fmt += str(sample.vdim) + dsfmt
-
-            if dtype == EParseDataType.NUM:
-                # scale numeric data
-                vect_scale_l = [x * scale for x in sample.data]
-                _bytes += struct.pack(fmt, sample.chan, *vect_scale_l)
-            elif dtype == EParseDataType.CHAR:
-                # string data
-                vect_scale_t = (bytes(sample.data[0], "utf"),)
-                _bytes += struct.pack(fmt, sample.chan, *vect_scale_t)
-            else:
-                # no data - encode channel num
-                _bytes += struct.pack(fmt, sample.chan)
+            # get bytes
+            _bytes += self._stream_bytes_get(decode, sample)
 
             # add metadata
             if len(msfmt) > 0:

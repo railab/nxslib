@@ -1,8 +1,13 @@
 import pytest  # type: ignore
 
-from nxslib.dev import Device, DeviceChannel
+from nxslib.dev import Device, DeviceChannel, EDeviceChannelType
 from nxslib.proto.iframe import EParseId
-from nxslib.proto.iparse import DParseStreamData, EParseIdSetFlags
+from nxslib.proto.iparse import (
+    DParseStreamData,
+    DsfmtItem,
+    EParseDataType,
+    EParseIdSetFlags,
+)
 from nxslib.proto.iparserecv import ParseRecvCb
 from nxslib.proto.parse import Parser
 from nxslib.proto.parserecv import ParseRecv
@@ -33,14 +38,14 @@ def test_nxslibparserecv_fames():
     # invalid recv_cb
     recv_cb = {}
     with pytest.raises(AssertionError):
-        recv = ParseRecv(cb=recv_cb, frame=SerialFrame)
+        recv = ParseRecv(recv_cb, SerialFrame)
 
     recv_cb = {"test": cb_cmninfo}
     with pytest.raises(AssertionError):
-        recv = ParseRecv(cb=recv_cb, frame=SerialFrame)
+        recv = ParseRecv(recv_cb, SerialFrame)
 
     recv_cb = ParseRecvCb(cb_cmninfo, cb_chinfo, cb_enable, cb_div, cb_start)
-    recv = ParseRecv(cb=recv_cb, frame=SerialFrame)
+    recv = ParseRecv(recv_cb, SerialFrame)
     assert isinstance(recv, ParseRecv)
 
     # no data
@@ -64,7 +69,7 @@ def test_nxslibparserecv_fames():
     assert recv.recv_handle(_bytes) is None
 
     # create parser
-    parser = Parser(frame=SerialFrame)
+    parser = Parser(SerialFrame)
 
     # valid cmninfo frame
     _bytes = parser.frame_cmninfo()
@@ -127,8 +132,8 @@ def test_nxslibparserecv_fames():
 
 def test_nxslibparserecv_decode():
     recv_cb = ParseRecvCb(cb_cmninfo, cb_chinfo, cb_enable, cb_div, cb_start)
-    recv = ParseRecv(cb=recv_cb, frame=SerialFrame)
-    parser = Parser(frame=SerialFrame)
+    recv = ParseRecv(recv_cb, SerialFrame)
+    parser = Parser(SerialFrame)
     frame = SerialFrame()
     d = Device(
         3,
@@ -183,7 +188,7 @@ def test_nxslibparserecv_decode():
 
 def test_nxslibparserecv_encode():
     recv_cb = ParseRecvCb(cb_cmninfo, cb_chinfo, cb_enable, cb_div, cb_start)
-    recv = ParseRecv(cb=recv_cb, frame=SerialFrame)
+    recv = ParseRecv(recv_cb, SerialFrame)
 
     # empty data
     samples = []
@@ -215,3 +220,43 @@ def test_nxslibparserecv_encode():
         DParseStreamData(0, 1, 0, 0, (), ()),
     ]
     assert recv.frame_stream_encode(samples) is None
+
+
+def test_nxslibparserecv_encode_user():
+    recv_cb = ParseRecvCb(cb_cmninfo, cb_chinfo, cb_enable, cb_div, cb_start)
+    user = {
+        EDeviceChannelType.USER1.value: DsfmtItem(
+            1, "iiii", None, EParseDataType.NUM, None, True
+        ),
+        EDeviceChannelType.USER2.value: DsfmtItem(
+            1,
+            "ccii",
+            None,
+            EParseDataType.COMPLEX,
+            [
+                EParseDataType.CHAR,
+                EParseDataType.CHAR,
+                EParseDataType.NUM,
+                EParseDataType.NUM,
+            ],
+            True,
+        ),
+    }
+    recv = ParseRecv(recv_cb, SerialFrame, user)
+
+    # empty data
+    samples = []
+    assert recv.frame_stream_encode(samples) is None
+
+    # samples for USER1
+    samples = [DParseStreamData(0, 2, 1, 0, (1,), ())]
+    assert recv.frame_stream_encode(samples) is not None
+    samples = [
+        DParseStreamData(
+            0, EDeviceChannelType.USER1.value, 16, 0, (1, 2, 3, 4), ()
+        ),
+        DParseStreamData(
+            0, EDeviceChannelType.USER2.value, 10, 0, (b"c", b"c", 1, 2), ()
+        ),
+    ]
+    assert recv.frame_stream_encode(samples) is not None
