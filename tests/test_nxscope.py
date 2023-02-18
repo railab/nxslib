@@ -113,9 +113,9 @@ def test_nxslib_stream():
     nxslib.stream_unsub(0, q0_1)
 
     # configure channels
-    nxslib.nxslib_channels_default_cfg()
-    nxslib.nxslib_ch_enable([0])
-    nxslib.nxslib_ch_divider([0], 1)
+    nxslib.channels_default_cfg()
+    nxslib.ch_enable([0])
+    nxslib.ch_divider([0], 1)
 
     # subscribe to streams
     q0_0 = nxslib.stream_sub(0)

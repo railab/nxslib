@@ -171,18 +171,18 @@ class NxscopeHandler:
                 continue
 
             # enable channel
-            self.nxslib_ch_enable(channel.chan)
+            self.ch_enable(channel.chan)
 
     def _chanlist_div(self, div: int | list[int]) -> None:
         if isinstance(div, int):
             for channel in self._chanlist:
-                self.nxslib_ch_divider(channel.chan, div)
+                self.ch_divider(channel.chan, div)
         else:
             assert isinstance(div, list)
             # divider list configuration must cover all configured channels
             assert len(div) == len(self._chanlist)
             for i, channel in enumerate(self._chanlist):
-                self.nxslib_ch_divider(channel.chan, div[i])
+                self.ch_divider(channel.chan, div[i])
 
     @property
     def dev(self) -> "Device | None":
@@ -232,21 +232,31 @@ class NxscopeHandler:
             # disconnect
             self._comm.disconnect()
 
-    def nxslib_channels_default_cfg(self) -> None:
-        """Set default channels configuration."""
+    def channels_default_cfg(self) -> None:
+        """Set default channels configuration.
+
+        The effects of this method are buffered and will
+        be applied to the device just before the stream starts.
+        """
         assert self._comm
         self._comm.channels_default_cfg()
 
-    def nxslib_ch_enable(self, chans: list | int) -> None:
+    def ch_enable(self, chans: list | int) -> None:
         """Enable a given channels.
+
+        The effects of this method are buffered and will
+        be applied to the device just before the stream starts.
 
         :param chans: single channel ID or list with channels IDs
         """
         assert self._comm
         self._comm.ch_enable(chans)
 
-    def nxslib_ch_divider(self, chans: list | int, div: int) -> None:
+    def ch_divider(self, chans: list | int, div: int) -> None:
         """Configure divider for a given channels.
+
+        The effects of this method are buffered and will
+        be applied to the device just before the stream starts.
 
         :param chans: single channel ID or list with channels IDs
         :param div: divider value to be set
@@ -271,7 +281,11 @@ class NxscopeHandler:
         return self.dev.channel_get(chid)
 
     def stream_start(self) -> None:
-        """Start NxScope stream."""
+        """Start a data stream.
+
+        Before starting the stream, the bufferd channel configuration
+        is applied to the device.
+        """
         assert self._comm
 
         if not self._stream_started:
@@ -287,7 +301,7 @@ class NxscopeHandler:
             self._stream_started = True
 
     def stream_stop(self) -> None:
-        """Stop NxScope stream."""
+        """Stop a data stream."""
         assert self._comm
 
         if self._stream_started is True:
@@ -337,7 +351,7 @@ class NxscopeHandler:
             return
 
         # default channels configuration
-        self.nxslib_channels_default_cfg()
+        self.channels_default_cfg()
 
         # enable channels
         self._chanlist_enable()
