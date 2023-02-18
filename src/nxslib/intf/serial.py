@@ -11,15 +11,7 @@ from nxslib.logger import logger
 
 
 class SerialDevice(ICommInterface):
-    """A class used to represent a serial interface.
-
-    To simulate UART with a NuttX sim target:
-         socat PTY,link=/dev/ttySIM0 PTY,link=/dev/ttyNX0
-         stty -F /dev/ttySIM0 raw
-         stty -F /dev/ttyNX0 raw
-         stty -F /dev/ttySIM0 115200
-         stty -F /dev/ttyNX0 115200
-    """
+    """A class used to represent a serial port interface."""
 
     def __init__(self, port: str, baud: int = 115200) -> None:
         """Intitialize a serial interface.
