@@ -27,6 +27,14 @@ class DNxscopeStream:
     data: tuple[Any, ...]
     meta: tuple[Any, ...]
 
+    def __str__(self):
+        """Human-readable stream item."""
+        return str(self.data) + ", " + str(self.meta)
+
+    def __repr__(self):
+        """Represent stream item as string."""
+        return str(self.data) + ", " + str(self.meta)
+
 
 ###############################################################################
 # Class: NxscopeHandler
