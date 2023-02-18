@@ -126,8 +126,12 @@ def test_nxslib_stream():
 
     # wait for data but channels no enabled
     data = q0_0.get(block=True, timeout=1)
+    print(data)
+    print(data[0])
     assert data
     data = q0_1.get(block=True, timeout=1)
+    print(data)
+    print(data[0])
     assert data
 
     # stop stream
