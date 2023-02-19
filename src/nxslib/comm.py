@@ -3,6 +3,7 @@
 import copy
 import queue
 from dataclasses import dataclass
+from threading import Lock
 
 from nxslib.dev import Device, DeviceChannel
 from nxslib.intf.iintf import ICommInterface
@@ -67,6 +68,7 @@ class CommHandler:
 
         # channels configuration
         self._channels: DCommChannelsData
+        self._channels_lock = Lock()
 
     def __del__(self) -> None:
         """Need to disconnect from the device."""
@@ -341,68 +343,72 @@ class CommHandler:
     def _nxslib_channels_enable(self) -> None:
         assert self._channels
         assert self.dev
-        j = 0
-        k = 0
-        for i, _ in enumerate(self._channels.en_now):
-            if self._channels.en_new[i] != self._channels.en_now[i]:
-                j += 1
-                k = i
+        with self._channels_lock:
+            j = 0
+            k = 0
+            for i, _ in enumerate(self._channels.en_now):
+                if self._channels.en_new[i] != self._channels.en_now[i]:
+                    j += 1
+                    k = i
 
-        if j == 1:
-            en_req_t = (k, self._channels.en_new[k])
-            ret = self._channel_enable(en_req_t)
-        else:
-            en_req_l = self._channels.en_new
-            ret = self._channel_enable(en_req_l)
-        if ret.state is False:  # pragma: no cover
-            return
+            if j == 1:
+                en_req_t = (k, self._channels.en_new[k])
+                ret = self._channel_enable(en_req_t)
+            else:
+                en_req_l = self._channels.en_new
+                ret = self._channel_enable(en_req_l)
+            if ret.state is False:  # pragma: no cover
+                return
 
-        # update states
-        self._channels.en_now = copy.deepcopy(self._channels.en_new)
-        self.dev.en_channels_update(self._channels.en_now)
+            # update states
+            self._channels.en_now = copy.deepcopy(self._channels.en_new)
+            self.dev.en_channels_update(self._channels.en_now)
 
     def _nxslib_channels_div(self) -> None:
         """Send nxslib div."""
         assert self._channels
         assert self.dev
 
-        j = 0
-        k = 0
-        for i, _ in enumerate(self._channels.div_now):
-            if self._channels.div_new[i] != self._channels.div_now[i]:
-                j += 1
-                k = i
+        with self._channels_lock:
+            j = 0
+            k = 0
+            for i, _ in enumerate(self._channels.div_now):
+                if self._channels.div_new[i] != self._channels.div_now[i]:
+                    j += 1
+                    k = i
 
-        if j == 1:
-            div_req_t = (k, self._channels.div_new[k])
-            ret = self._channel_div(div_req_t)
-        else:
-            div_req_l = self._channels.div_new
-            ret = self._channel_div(div_req_l)
-        if ret.state is False:  # pragma: no cover
-            return
+            if j == 1:
+                div_req_t = (k, self._channels.div_new[k])
+                ret = self._channel_div(div_req_t)
+            else:
+                div_req_l = self._channels.div_new
+                ret = self._channel_div(div_req_l)
+            if ret.state is False:  # pragma: no cover
+                return
 
-        # update states
-        self._channels.div_now = copy.deepcopy(self._channels.div_new)
-        self.dev.div_channels_update(self._channels.div_now)
+            # update states
+            self._channels.div_now = copy.deepcopy(self._channels.div_new)
+            self.dev.div_channels_update(self._channels.div_now)
 
     def _ch_divider_default(self) -> None:
         """Set all channels divider to default."""
         assert self._channels
-        for i, _ in enumerate(self._channels.div_new):
-            self._channels.div_new[i] = 0
+        with self._channels_lock:
+            for i, _ in enumerate(self._channels.div_new):
+                self._channels.div_new[i] = 0
 
     def _channels_init(self, dev: Device) -> None:
         """Initialize channels.
 
         :param dev: Nxscope device instance
         """
-        self._channels = DCommChannelsData(
-            copy.deepcopy(dev.channels_en),
-            copy.deepcopy(dev.channels_en),
-            copy.deepcopy(dev.channels_div),
-            copy.deepcopy(dev.channels_div),
-        )
+        with self._channels_lock:
+            self._channels = DCommChannelsData(
+                copy.deepcopy(dev.channels_en),
+                copy.deepcopy(dev.channels_en),
+                copy.deepcopy(dev.channels_div),
+                copy.deepcopy(dev.channels_div),
+            )
 
     @property
     def dev(self) -> Device | None:
@@ -481,13 +487,14 @@ class CommHandler:
         :param chans: single channel ID or a list with channels IDs
         """
         assert self._channels
-        if isinstance(chans, list):
-            for chan in chans:
-                self._channels.en_new[chan] = True
-        elif isinstance(chans, int):
-            self._channels.en_new[chans] = True
-        else:
-            raise TypeError
+        with self._channels_lock:
+            if isinstance(chans, list):
+                for chan in chans:
+                    self._channels.en_new[chan] = True
+            elif isinstance(chans, int):
+                self._channels.en_new[chans] = True
+            else:
+                raise TypeError
 
     def ch_disable(self, chans: list[int] | int) -> None:
         """Disable specific channel.
@@ -495,13 +502,14 @@ class CommHandler:
         :param chans: single channel ID or a list with channels IDs
         """
         assert self._channels
-        if isinstance(chans, list):
-            for chan in chans:
-                self._channels.en_new[chan] = False
-        elif isinstance(chans, int):
-            self._channels.en_new[chans] = False
-        else:
-            raise TypeError
+        with self._channels_lock:
+            if isinstance(chans, list):
+                for chan in chans:
+                    self._channels.en_new[chan] = False
+            elif isinstance(chans, int):
+                self._channels.en_new[chans] = False
+            else:
+                raise TypeError
 
     def ch_divider(self, chans: list[int] | int, div: int) -> None:
         """Set channel divider.
@@ -517,13 +525,14 @@ class CommHandler:
         if not self.dev.div_supported and div > 0:
             logger.error("divider not supported by device !")
 
-        if isinstance(chans, list):
-            for chan in chans:
-                self._channels.div_new[chan] = div
-        elif isinstance(chans, int):
-            self._channels.div_new[chans] = div
-        else:
-            raise TypeError
+        with self._channels_lock:
+            if isinstance(chans, list):
+                for chan in chans:
+                    self._channels.div_new[chan] = div
+            elif isinstance(chans, int):
+                self._channels.div_new[chans] = div
+            else:
+                raise TypeError
 
     def ch_enable_all(self) -> None:
         """Enable all channels."""
@@ -543,7 +552,8 @@ class CommHandler:
         :param chan: channel ID
         """
         assert self._channels
-        return self._channels.en_now[chan]
+        with self._channels_lock:
+            return self._channels.en_now[chan]
 
     def ch_div_get(self, chan: int) -> int:
         """Get channel divider.
@@ -551,7 +561,8 @@ class CommHandler:
         :param chid: the channel ID
         """
         assert self._channels
-        return self._channels.div_now[chan]
+        with self._channels_lock:
+            return self._channels.div_now[chan]
 
     def channels_default_cfg(self) -> None:
         """Set default channels configuration."""
