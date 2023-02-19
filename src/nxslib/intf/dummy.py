@@ -3,7 +3,6 @@
 import math
 import queue
 import random
-import threading
 import time
 
 from nxslib.dev import (
@@ -295,7 +294,10 @@ class DummyDev(ICommInterface):
     ) -> None:
         """Intitialize a dummy NxScope interface."""
         super().__init__()
-        self._thrd = ThreadCommon(self._thread, name="dummy")
+        self._thrd_stream = ThreadCommon(
+            self._thread_stream, name="dummy_stream"
+        )
+        self._thrd_recv = ThreadCommon(self._thread_recv, name="dummy_recv")
 
         # default device
         if not channels:
@@ -308,9 +310,6 @@ class DummyDev(ICommInterface):
         self._stream_snum = stream_snum
         self._qwrite: queue.Queue[bytes] = queue.Queue()
         self._qread: queue.Queue[bytes] = queue.Queue()
-
-        self._stream_now = threading.Event()
-        self._stream_now.clear()
 
         self._parse: ParseRecv | None = None
 
@@ -366,11 +365,11 @@ class DummyDev(ICommInterface):
 
         # start/stop stream
         if start is True:
-            self._stream_now.set()
+            self._thrd_stream.thread_start()
         else:
-            self._stream_now.clear()
+            self._thrd_stream.thread_stop()
 
-        # send ACK before action
+        # send ACK after action
         if self._dev.ack_supported:
             _bytes = self._parse.frame_ack_encode(0)
             self._qread.put(_bytes)
@@ -398,34 +397,35 @@ class DummyDev(ICommInterface):
 
         return samples
 
-    def _stream_handle(self, data: list[DParseStreamData]) -> None:
+    def _thread_stream(self) -> None:
         assert self._parse
 
-        frame = self._parse.frame_stream_encode(data)
+        samples = self._stream_data_get(self._stream_snum)
+        frame = self._parse.frame_stream_encode(samples)
         if frame is not None:  # pragma: no cover
             self._qread.put(frame)
 
-    def _thread(self) -> None:
+        time.sleep(self._stream_sleep)
+
+    def _thread_recv(self) -> None:
         assert self._parse
 
         data = None
         try:
-            data = self._qwrite.get(block=True, timeout=0.001)
+            # NOTE: timeout must be not zero otherwise we have
+            #       deadlock when thread stop is requested
+            data = self._qwrite.get(block=True, timeout=0.01)
         except queue.Empty:
             pass
 
         if data is not None:
             self._parse.recv_handle(data)
 
-        if self._stream_now.is_set():
-            _samples = self._stream_data_get(self._stream_snum)
-            self._stream_handle(_samples)
-            time.sleep(self._stream_sleep)
-
     def stop(self) -> None:
         """Stop the interface."""
         logger.debug("Stop dummy interface")
-        self._thrd.thread_stop()
+        self._thrd_stream.thread_stop()
+        self._thrd_recv.thread_stop()
 
         # get all pending data from queues
         try:
@@ -458,7 +458,7 @@ class DummyDev(ICommInterface):
         # reset dev state
         self._dev.reset()
 
-        self._thrd.thread_start()
+        self._thrd_recv.thread_start()
 
     def drop_all(self) -> None:
         """Drop all frames."""
