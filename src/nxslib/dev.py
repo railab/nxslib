@@ -313,6 +313,18 @@ class Device(DDeviceData):
 
         return ret
 
+    def div_channels_update(self, div: list[int]) -> None:
+        """Update div state for channels."""
+        assert len(div) == len(self.channels)
+        for i, chdiv in enumerate(div):
+            self.channels[i].div = chdiv
+
+    def en_channels_update(self, en: list[bool]) -> None:
+        """Update enable state for channels."""
+        assert len(en) == len(self.channels)
+        for i, chen in enumerate(en):
+            self.channels[i].en = chen
+
     def reset(self) -> None:
         """Reset device state."""
         for chan in self.channels:
