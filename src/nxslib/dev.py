@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
+from threading import Lock
 from typing import Any
 
 ###############################################################################
@@ -272,6 +273,8 @@ class Device(DDeviceData):
         # all channels should have unique ids
         assert len(set(chanids)) == len(chanids)
 
+        self._channels_lock = Lock()
+
     def __str__(self) -> str:
         """Get device string represenation."""
         _str = (
@@ -300,36 +303,40 @@ class Device(DDeviceData):
     def channels_en(self) -> list[bool]:
         """Get channels enable state."""
         ret = []
-        for chan in self.channels:
-            ret.append(chan.en)
+        with self._channels_lock:
+            for chan in self.channels:
+                ret.append(chan.en)
         return ret
 
     @property
     def channels_div(self) -> list[int]:
         """Get channels divider state."""
         ret = []
-        for chan in self.channels:
-            ret.append(chan.div)
-
+        with self._channels_lock:
+            for chan in self.channels:
+                ret.append(chan.div)
         return ret
 
     def div_channels_update(self, div: list[int]) -> None:
         """Update div state for channels."""
-        assert len(div) == len(self.channels)
-        for i, chdiv in enumerate(div):
-            self.channels[i].div = chdiv
+        with self._channels_lock:
+            assert len(div) == len(self.channels)
+            for i, chdiv in enumerate(div):
+                self.channels[i].div = chdiv
 
     def en_channels_update(self, en: list[bool]) -> None:
         """Update enable state for channels."""
-        assert len(en) == len(self.channels)
-        for i, chen in enumerate(en):
-            self.channels[i].en = chen
+        with self._channels_lock:
+            assert len(en) == len(self.channels)
+            for i, chen in enumerate(en):
+                self.channels[i].en = chen
 
     def reset(self) -> None:
         """Reset device state."""
-        for chan in self.channels:
-            # reset channels
-            chan.reset()
+        with self._channels_lock:
+            for chan in self.channels:
+                # reset channels
+                chan.reset()
 
     def channel_get(self, chid: int) -> DeviceChannel | None:
         """Get device channel.
@@ -337,6 +344,7 @@ class Device(DDeviceData):
         :param chid: channel ID
         """
         try:
-            return self.channels[chid]
+            with self._channels_lock:
+                return self.channels[chid]
         except IndexError:
             return None
