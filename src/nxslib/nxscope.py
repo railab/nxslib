@@ -133,11 +133,6 @@ class NxscopeHandler:
     def _reset_stats(self) -> None:
         self._ovf_cntr = 0
 
-    def _channels_write(self) -> None:
-        """Write channels configuration."""
-        assert self._comm
-        self._comm.channels_write()
-
     @property
     def dev(self) -> "Device | None":
         """Get device info."""
@@ -207,7 +202,7 @@ class NxscopeHandler:
 
         if not self._stream_started:
             # initialize stream
-            self._channels_write()
+            self.channels_write()
 
             # start request for nxslib
             self._nxslib_start()
@@ -265,7 +260,7 @@ class NxscopeHandler:
 
         if writenow:
             # write channels configuration
-            self._channels_write()
+            self.channels_write()
 
     def ch_enable(
         self, chans: list[int] | int, writenow: bool = False
@@ -284,7 +279,7 @@ class NxscopeHandler:
 
         if writenow:
             # write channels configuration
-            self._channels_write()
+            self.channels_write()
 
     def ch_disable(
         self, chans: list[int] | int, writenow: bool = False
@@ -303,7 +298,7 @@ class NxscopeHandler:
 
         if writenow:
             # write channels configuration
-            self._channels_write()
+            self.channels_write()
 
     def ch_divider(
         self, chans: list[int] | int, div: int, writenow: bool = False
@@ -323,4 +318,9 @@ class NxscopeHandler:
 
         if writenow:
             # write channels configuration
-            self._channels_write()
+            self.channels_write()
+
+    def channels_write(self) -> None:
+        """Write channels configuration."""
+        assert self._comm
+        self._comm.channels_write()
