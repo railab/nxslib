@@ -260,18 +260,18 @@ class Device(DDeviceData):
         :param rxpadding: RX padding
         :param channels: device channels
         """
-        super().__init__(chmax, flags, rxpadding, channels)
-
-        assert len(self.channels) == self.chmax
-        self.channels = []
+        # all channels should have unique ids
         chanids = []
         for chan in channels:
             assert isinstance(chan, DeviceChannel)
-            self.channels.append(chan)
             chanids.append(chan.chan)
-
-        # all channels should have unique ids
         assert len(set(chanids)) == len(chanids)
+
+        # initialize data
+        super().__init__(chmax, flags, rxpadding, channels)
+
+        # channels must mach chmax
+        assert len(self.channels) == self.chmax
 
         self._channels_lock = Lock()
 
