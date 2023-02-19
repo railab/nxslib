@@ -62,6 +62,8 @@ class CommHandler:
 
         # recv queue
         self._q: queue.Queue[DParseFrame] = queue.Queue()
+        # stream frames queue
+        self._q_stream: queue.Queue[DParseFrame] = queue.Queue()
 
         # channels configuration
         self._channels: DCommChannelsData
@@ -82,6 +84,9 @@ class CommHandler:
             if self.dev is None and self._parse.frame_is_ack(frame):
                 # drop ACK frames if we dont have dev info yet
                 pass
+            elif self._parse.frame_is_stream(frame):
+                # special queue for stream frames
+                self._q_stream.put(frame)
             else:
                 self._q.put(frame)
 
@@ -89,6 +94,16 @@ class CommHandler:
         """Get frame from queue."""
         try:
             frame = self._q.get(block=True, timeout=timeout)
+
+        except queue.Empty:
+            frame = None
+
+        return frame
+
+    def _get_stream_frame(self, timeout: float = 1.0) -> DParseFrame | None:
+        """Get frame from stream queue."""
+        try:
+            frame = self._q_stream.get(block=True, timeout=timeout)
 
         except queue.Empty:
             frame = None
@@ -103,11 +118,11 @@ class CommHandler:
 
         frame = self._get_frame(timeout)
         if frame is None:  # pragma: no cover
-            return ParseAck(False, 0)
+            return ParseAck(False, -1)
 
         ret = self._parse.frame_ack_decode(frame)
         if ret is None:  # pragma: no cover
-            return ParseAck(False, 0)
+            return ParseAck(False, -2)
 
         return ret
 
@@ -429,16 +444,13 @@ class CommHandler:
         """Get stream data."""
         assert self.dev
 
-        frame = self._get_frame()
+        # separate queue for stream frames
+        frame = self._get_stream_frame()
         if not frame:
             return None
 
-        # TODO: revisit, how to handle this properly ?
-        #       put frame back on queue if this was not stream
-        #       frame (eg. ACK frame)
+        assert self._parse.frame_is_stream(frame)
         ret = self._parse.frame_stream_decode(frame, self.dev)
-        if ret is None:  # pragma: no cover
-            self._q.put(frame)
 
         return ret
 
