@@ -149,49 +149,6 @@ def test_nxslib_stream():
     nxslib.disconnect()
 
 
-def test_nxslib_channels_configure():
-    intf = DummyDev()
-    parse = Parser()
-    comm = CommHandler(intf, parse)
-    nxslib = NxscopeHandler()
-
-    nxslib.intf_connect(comm)
-
-    # connect
-    nxslib.connect()
-
-    # no configured channels at default
-    assert nxslib.chanlist == []
-
-    # configure channels
-    nxslib.channels_configure([], [])
-    nxslib.channels_configure([0], [1])
-    nxslib.channels_configure([1], [2])
-    nxslib.channels_configure([1, 2], [1, 1])
-    nxslib.channels_configure([1, 2, 3], 1)
-    nxslib.channels_configure([1, 2, 3], [1, 2, 3])
-    nxslib.channels_configure([-1], 4)
-
-    # unsupported channel type
-    with pytest.raises(AssertionError):
-        nxslib.channels_configure(None, 1)
-
-    # unsupported channel string
-    with pytest.raises(AssertionError):
-        nxslib.channels_configure("bal", 1)
-
-    # unsupported channel
-    with pytest.raises(AssertionError):
-        nxslib.channels_configure([256], 1)
-
-    # channels len != div len
-    with pytest.raises(AssertionError):
-        nxslib.channels_configure([1, 2, 3], [1, 2])
-
-    # disconnect
-    nxslib.disconnect()
-
-
 def test_nxslib_channels_runtime():
     intf = DummyDev()
     parse = Parser()
@@ -296,8 +253,12 @@ def test_nxslib_channels_runtime():
     assert dev1.div == 10
     assert dev2.div == 0
 
-    # reconfig
-    nxslib.channels_configure([0, 1, 2], [5, 5, 5], writenow=True)
+    nxslib.ch_enable(0, writenow=True)
+    nxslib.ch_divider(0, 5, writenow=True)
+    nxslib.ch_enable(1, writenow=True)
+    nxslib.ch_divider(1, 5, writenow=True)
+    nxslib.ch_enable(2, writenow=True)
+    nxslib.ch_divider(2, 5, writenow=True)
 
     assert dev0.en is True
     assert dev1.en is True
