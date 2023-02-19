@@ -64,11 +64,6 @@ class NxscopeHandler:
         """Make sure to disconnect from dev."""
         self.disconnect()
 
-    def _nxslib_stream_init(self) -> None:
-        """Send nxslib stream initialization data."""
-        assert self._comm
-        self._comm.stream_init()
-
     def _nxslib_start(self) -> bool:
         """Send nxslib start request."""
         assert self._comm
@@ -184,6 +179,11 @@ class NxscopeHandler:
             for i, channel in enumerate(self._chanlist):
                 self.ch_divider(channel.chan, div[i])
 
+    def _channels_write(self) -> None:
+        """Write channels configuration."""
+        assert self._comm
+        self._comm.channels_write()
+
     @property
     def dev(self) -> "Device | None":
         """Get device info."""
@@ -232,38 +232,6 @@ class NxscopeHandler:
             # disconnect
             self._comm.disconnect()
 
-    def channels_default_cfg(self) -> None:
-        """Set default channels configuration.
-
-        The effects of this method are buffered and will
-        be applied to the device just before the stream starts.
-        """
-        assert self._comm
-        self._comm.channels_default_cfg()
-
-    def ch_enable(self, chans: list[int] | int) -> None:
-        """Enable a given channels.
-
-        The effects of this method are buffered and will
-        be applied to the device just before the stream starts.
-
-        :param chans: single channel ID or list with channels IDs
-        """
-        assert self._comm
-        self._comm.ch_enable(chans)
-
-    def ch_divider(self, chans: list[int] | int, div: int) -> None:
-        """Configure divider for a given channels.
-
-        The effects of this method are buffered and will
-        be applied to the device just before the stream starts.
-
-        :param chans: single channel ID or list with channels IDs
-        :param div: divider value to be set
-        """
-        assert self._comm
-        self._comm.ch_divider(chans, div)
-
     def intf_connect(self, comm: "CommHandler") -> None:
         """Connect a NxScope communication handler.
 
@@ -290,7 +258,7 @@ class NxscopeHandler:
 
         if not self._stream_started:
             # initialize stream
-            self._nxslib_stream_init()
+            self._channels_write()
 
             # start request for nxslib
             self._nxslib_start()
@@ -335,13 +303,94 @@ class NxscopeHandler:
                 if subq in sub:
                     self._sub_q[i].remove(subq)
 
+    def channels_default_cfg(self, writenow: bool = False) -> None:
+        """Set default channels configuration.
+
+        The effects of this method are buffered and will
+        be applied to the device just before the stream starts
+        or can be forced to write with writenow flag.
+        :param writenow: write channels configuration now
+        """
+        assert self._comm
+        self._comm.channels_default_cfg()
+
+        if writenow:
+            # write channels configuration
+            self._channels_write()
+
+    def ch_enable(
+        self, chans: list[int] | int, writenow: bool = False
+    ) -> None:
+        """Enable a given channels.
+
+        The effects of this method are buffered and will
+        be applied to the device just before the stream starts
+        or can be forced to write with writenow flag.
+
+        :param chans: single channel ID or list with channels IDs
+        :param writenow: write channels configuration now
+        """
+        assert self._comm
+        self._comm.ch_enable(chans)
+
+        if writenow:
+            # write channels configuration
+            self._channels_write()
+
+    def ch_disable(
+        self, chans: list[int] | int, writenow: bool = False
+    ) -> None:
+        """Disable a given channels.
+
+        The effects of this method are buffered and will
+        be applied to the device just before the stream starts
+        or can be forced to write with writenow flag.
+
+        :param chans: single channel ID or list with channels IDs
+        :param writenow: write channels configuration now
+        """
+        assert self._comm
+        self._comm.ch_disable(chans)
+
+        if writenow:
+            # write channels configuration
+            self._channels_write()
+
+    def ch_divider(
+        self, chans: list[int] | int, div: int, writenow: bool = False
+    ) -> None:
+        """Configure divider for a given channels.
+
+        The effects of this method are buffered and will
+        be applied to the device just before the stream starts
+        or can be forced to write with writenow flag.
+
+        :param chans: single channel ID or list with channels IDs
+        :param div: divider value to be set
+        :param writenow: write channels configuration now
+        """
+        assert self._comm
+        self._comm.ch_divider(chans, div)
+
+        if writenow:
+            # write channels configuration
+            self._channels_write()
+
     def channels_configure(
-        self, channels: list[int], div: int | list[int] = 0
+        self,
+        channels: list[int],
+        div: int | list[int] = 0,
+        writenow: bool = False,
     ) -> None:
         """Configure channels.
 
+        The effects of this method are buffered and will
+        be applied to the device just before the stream starts
+        or can be forced to write with writenow flag.
+
         :param chans: a list with channels IDs
         :param div: a list with divider values
+        :param writenow: write channels configuration now
         """
         assert self.dev
 
@@ -360,4 +409,6 @@ class NxscopeHandler:
         # set divider for channels
         self._chanlist_div(div)
 
-        return
+        if writenow:
+            # write channels configuration
+            self._channels_write()

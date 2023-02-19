@@ -317,6 +317,7 @@ class CommHandler:
 
     def _nxslib_channels_enable(self) -> None:
         assert self._channels
+        assert self.dev
         j = 0
         k = 0
         for i, _ in enumerate(self._channels.en_now):
@@ -333,11 +334,15 @@ class CommHandler:
         if ret.state is False:  # pragma: no cover
             return
 
+        # update states
         self._channels.en_now = copy.deepcopy(self._channels.en_new)
+        self.dev.en_channels_update(self._channels.en_now)
 
     def _nxslib_channels_div(self) -> None:
         """Send nxslib div."""
         assert self._channels
+        assert self.dev
+
         j = 0
         k = 0
         for i, _ in enumerate(self._channels.div_now):
@@ -354,7 +359,9 @@ class CommHandler:
         if ret.state is False:  # pragma: no cover
             return
 
+        # update states
         self._channels.div_now = copy.deepcopy(self._channels.div_new)
+        self.dev.div_channels_update(self._channels.div_now)
 
     def _ch_divider_default(self) -> None:
         """Set all channels divider to default."""
@@ -435,23 +442,18 @@ class CommHandler:
 
         return ret
 
-    def stream_channels_init(self, dev: Device) -> None:
+    def channels_write(self) -> None:
         """Initialize channels for stream.
 
         :param dev: Nxscope device instance
         """
         assert self.dev
-        if dev.div_supported:
+        if self.dev.div_supported:
             # send div request
             self._nxslib_channels_div()
 
         # send enable request
         self._nxslib_channels_enable()
-
-    def stream_init(self) -> None:
-        """Initialize stream."""
-        assert self.dev
-        self.stream_channels_init(self.dev)
 
     def ch_enable(self, chans: list[int] | int) -> None:
         """Enable specific channel.

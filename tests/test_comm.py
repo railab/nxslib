@@ -62,7 +62,7 @@ def test_nxslib_channels(comm):
 
     # default configuration
     comm.channels_default_cfg()
-    comm.stream_init()
+    comm.channels_write()
     for chan in range(comm.dev.chmax):
         assert comm.ch_is_enabled(chan) is False
         assert comm.ch_div_get(chan) == 0
@@ -79,18 +79,18 @@ def test_nxslib_channels(comm):
 
     # enable all channels
     comm.ch_enable_all()
-    comm.stream_init()
+    comm.channels_write()
     for chan in range(comm.dev.chmax):
         assert comm.ch_is_enabled(chan) is True
         assert comm.ch_div_get(chan) == 0
 
     # enable all once again
     comm.ch_enable_all()
-    comm.stream_init()
+    comm.channels_write()
 
     # disable channel
     comm.ch_disable(0)
-    comm.stream_init()
+    comm.channels_write()
     assert comm.ch_is_enabled(0) is False
     assert comm.ch_is_enabled(1) is True
     assert comm.ch_is_enabled(2) is True
@@ -98,15 +98,15 @@ def test_nxslib_channels(comm):
 
     # disable channels
     comm.ch_disable([1, 3])
-    comm.stream_init()
+    comm.channels_write()
 
     # once again
     comm.ch_disable([1, 3])
-    comm.stream_init()
+    comm.channels_write()
 
     # divider
     comm.ch_divider(1, 1)
-    comm.stream_init()
+    comm.channels_write()
     assert comm.ch_div_get(0) == 0
     assert comm.ch_div_get(1) == 1
     assert comm.ch_div_get(2) == 0
@@ -114,7 +114,7 @@ def test_nxslib_channels(comm):
 
     # divider
     comm.ch_divider([0, 3], 3)
-    comm.stream_init()
+    comm.channels_write()
     assert comm.ch_div_get(0) == 3
     assert comm.ch_div_get(1) == 1
     assert comm.ch_div_get(2) == 0
@@ -132,7 +132,7 @@ def test_nxslib_stream_ch1(comm):
 
     # enable channel 1
     comm.ch_enable(1)
-    comm.stream_init()
+    comm.channels_write()
 
     # no stream - should be no data
     assert comm.stream_data() is None
@@ -170,7 +170,7 @@ def test_nxslib_stream_ch1ch2(comm):
 
     # enable channel 1 and 2
     comm.ch_enable([1, 2])
-    comm.stream_init()
+    comm.channels_write()
 
     # no stream - should be no data
     assert comm.stream_data() is None
@@ -208,7 +208,7 @@ def test_nxslib_stream_ch6(comm):
 
     # enable channel 6
     comm.ch_enable(6)
-    comm.stream_init()
+    comm.channels_write()
 
     # no stream - should be no data
     assert comm.stream_data() is None
@@ -247,7 +247,7 @@ def test_nxslib_stream_ch7(comm):
 
     # enable channel 7
     comm.ch_enable(7)
-    comm.stream_init()
+    comm.channels_write()
 
     # no stream - should be no data
     assert comm.stream_data() is None
@@ -288,7 +288,7 @@ def test_nxslib_stream_ch8(comm):
 
     # enable channel 8
     comm.ch_enable(8)
-    comm.stream_init()
+    comm.channels_write()
 
     # no stream - should be no data
     assert comm.stream_data() is None
@@ -344,11 +344,11 @@ def test_nxslib_nodiv(comm):
 
     # default configuration
     comm.channels_default_cfg()
-    comm.stream_init()
+    comm.channels_write()
 
     comm.ch_enable(0)
     comm.ch_divider(1, 1)
-    comm.stream_init()
+    comm.channels_write()
     assert comm.ch_is_enabled(0) is True
     assert comm.ch_div_get(0) == 0
 
@@ -366,11 +366,11 @@ def test_nxslib_noack(comm):
 
     # default configuration
     comm.channels_default_cfg()
-    comm.stream_init()
+    comm.channels_write()
 
     comm.ch_enable(0)
     comm.ch_divider(1, 1)
-    comm.stream_init()
+    comm.channels_write()
     assert comm.ch_is_enabled(0) is True
     assert comm.ch_div_get(0) == 0
 
