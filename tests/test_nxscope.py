@@ -114,7 +114,11 @@ def test_nxslib_stream():
 
     # configure channels
     nxslib.channels_default_cfg()
+    # enable/disable
     nxslib.ch_enable([0])
+    nxslib.ch_disable([0])
+    nxslib.ch_enable([0])
+    # divider
     nxslib.ch_divider([0], 1)
 
     # subscribe to streams
@@ -138,8 +142,8 @@ def test_nxslib_stream():
     nxslib.stream_stop()
 
     # subscribe to streams
-    q0_0 = nxslib.stream_sub(0)
-    q0_1 = nxslib.stream_sub(0)
+    nxslib.stream_unsub(q0_0)
+    nxslib.stream_unsub(q0_1)
 
     # disconnect
     nxslib.disconnect()
@@ -183,6 +187,131 @@ def test_nxslib_channels_configure():
     # channels len != div len
     with pytest.raises(AssertionError):
         nxslib.channels_configure([1, 2, 3], [1, 2])
+
+    # disconnect
+    nxslib.disconnect()
+
+
+def test_nxslib_channels_runtime():
+    intf = DummyDev()
+    parse = Parser()
+    comm = CommHandler(intf, parse)
+    nxslib = NxscopeHandler()
+
+    nxslib.intf_connect(comm)
+
+    # connect
+    nxslib.connect()
+
+    # force default state
+    nxslib.channels_default_cfg(writenow=True)
+
+    # get device handlers
+    dev0 = nxslib.dev_channel_get(0)
+    dev1 = nxslib.dev_channel_get(1)
+    dev2 = nxslib.dev_channel_get(2)
+
+    assert dev0.en is False
+    assert dev1.en is False
+    assert dev2.en is False
+    assert dev0.div == 0
+    assert dev1.div == 0
+    assert dev2.div == 0
+
+    # subscribe to streams
+    q0 = nxslib.stream_sub(0)
+    q1 = nxslib.stream_sub(1)
+    q2 = nxslib.stream_sub(2)
+
+    nxslib.channels_default_cfg(writenow=True)
+
+    # start stream without channels configured
+    nxslib.stream_start()
+
+    nxslib.channels_default_cfg(writenow=True)
+
+    assert dev0.en is False
+    assert dev1.en is False
+    assert dev2.en is False
+    assert dev0.div == 0
+    assert dev1.div == 0
+    assert dev2.div == 0
+
+    # wait for data but channels no enabled
+    with pytest.raises(queue.Empty):
+        _ = q0.get(block=True, timeout=0.5)
+    with pytest.raises(queue.Empty):
+        _ = q1.get(block=True, timeout=0.5)
+    with pytest.raises(queue.Empty):
+        _ = q2.get(block=True, timeout=0.5)
+
+    # reconfig
+    nxslib.ch_enable(0, writenow=True)
+    nxslib.ch_divider(0, 1, writenow=True)
+
+    assert dev0.en is True
+    assert dev1.en is False
+    assert dev2.en is False
+    assert dev0.div == 1
+    assert dev1.div == 0
+    assert dev2.div == 0
+
+    # wait for data
+    data = q0.get(block=True, timeout=0.5)
+    assert data
+    with pytest.raises(queue.Empty):
+        _ = q1.get(block=True, timeout=0.5)
+    with pytest.raises(queue.Empty):
+        _ = q2.get(block=True, timeout=0.5)
+
+    # reconfig
+    nxslib.ch_enable(1, writenow=True)
+    nxslib.ch_divider(1, 5, writenow=True)
+
+    assert dev0.en is True
+    assert dev1.en is True
+    assert dev2.en is False
+    assert dev0.div == 1
+    assert dev1.div == 5
+    assert dev2.div == 0
+
+    # wait for data
+    data = q0.get(block=True, timeout=0.5)
+    assert data
+    data = q1.get(block=True, timeout=0.5)
+    assert data
+    with pytest.raises(queue.Empty):
+        _ = q2.get(block=True, timeout=0.5)
+
+    # reconfig
+    nxslib.ch_disable(0, writenow=True)
+    nxslib.ch_divider(0, 0, writenow=True)
+    nxslib.ch_enable(1, writenow=True)
+    nxslib.ch_divider(1, 10, writenow=True)
+
+    assert dev0.en is False
+    assert dev1.en is True
+    assert dev2.en is False
+    assert dev0.div == 0
+    assert dev1.div == 10
+    assert dev2.div == 0
+
+    # reconfig
+    nxslib.channels_configure([0, 1, 2], [5, 5, 5], writenow=True)
+
+    assert dev0.en is True
+    assert dev1.en is True
+    assert dev2.en is True
+    assert dev0.div == 5
+    assert dev1.div == 5
+    assert dev2.div == 5
+
+    # stop stream
+    nxslib.stream_stop()
+
+    nxslib.stream_unsub(q0)
+    nxslib.stream_unsub(q1)
+    nxslib.stream_unsub(q2)
 
     # disconnect
     nxslib.disconnect()
