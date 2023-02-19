@@ -351,5 +351,9 @@ class ICommParse(ABC):
         """Return true if a given frame is ACK."""
 
     @abstractmethod
+    def frame_is_stream(self, frame: "DParseFrame") -> bool:
+        """Return true if a given frame is STREAM."""
+
+    @abstractmethod
     def frame_ack_decode(self, frame: "DParseFrame") -> ParseAck | None:
         """Decode ACK frame."""
