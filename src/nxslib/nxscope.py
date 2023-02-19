@@ -48,8 +48,6 @@ class NxscopeHandler:
         """Initialize the Nxslib handler."""
         self._comm: "CommHandler"
 
-        self._chanlist: list["DeviceChannel"] = []
-
         self._thrd = ThreadCommon(self._stream_thread, name="stream")
 
         self._sub_q: list[list[queue.Queue[list[DNxscopeStream]]]] = []
@@ -135,50 +133,6 @@ class NxscopeHandler:
     def _reset_stats(self) -> None:
         self._ovf_cntr = 0
 
-    def _chanlist_gen(self, channels: list[int]) -> list["DeviceChannel"]:
-        assert self.dev
-        assert isinstance(channels, list)
-
-        # convert special keys for all channels
-        if channels and channels[0] == -1:
-            chanlist = list(range(self.dev.chmax))
-        else:
-            assert all(isinstance(x, int) for x in channels)
-            chanlist = channels
-
-        # get channels data
-        ret = []
-        for chan in chanlist:
-            assert isinstance(chan, int)
-            channel = self.dev_channel_get(chan)
-            assert channel
-            ret.append(channel)
-
-        return ret
-
-    def _chanlist_enable(self) -> None:
-        for channel in self._chanlist:
-            # ignore not valid channels
-            if not channel.is_valid:
-                logger.info(
-                    "NOTE: channel %d not valid - ignore", channel.chan
-                )
-                continue
-
-            # enable channel
-            self.ch_enable(channel.chan)
-
-    def _chanlist_div(self, div: int | list[int]) -> None:
-        if isinstance(div, int):
-            for channel in self._chanlist:
-                self.ch_divider(channel.chan, div)
-        else:
-            assert isinstance(div, list)
-            # divider list configuration must cover all configured channels
-            assert len(div) == len(self._chanlist)
-            for i, channel in enumerate(self._chanlist):
-                self.ch_divider(channel.chan, div[i])
-
     def _channels_write(self) -> None:
         """Write channels configuration."""
         assert self._comm
@@ -189,11 +143,6 @@ class NxscopeHandler:
         """Get device info."""
         assert self._comm
         return self._comm.dev
-
-    @property
-    def chanlist(self) -> list["DeviceChannel"]:
-        """Get configured channels list."""
-        return self._chanlist
 
     @property
     def intf_is_connected(self) -> bool:
@@ -371,43 +320,6 @@ class NxscopeHandler:
         """
         assert self._comm
         self._comm.ch_divider(chans, div)
-
-        if writenow:
-            # write channels configuration
-            self._channels_write()
-
-    def channels_configure(
-        self,
-        channels: list[int],
-        div: int | list[int] = 0,
-        writenow: bool = False,
-    ) -> None:
-        """Configure channels.
-
-        The effects of this method are buffered and will
-        be applied to the device just before the stream starts
-        or can be forced to write with writenow flag.
-
-        :param chans: a list with channels IDs
-        :param div: a list with divider values
-        :param writenow: write channels configuration now
-        """
-        assert self.dev
-
-        logger.info("configure channels = %s divider = %d", str(channels), div)
-
-        self._chanlist = self._chanlist_gen(channels)
-        if not self._chanlist:
-            return
-
-        # default channels configuration
-        self.channels_default_cfg()
-
-        # enable channels
-        self._chanlist_enable()
-
-        # set divider for channels
-        self._chanlist_div(div)
 
         if writenow:
             # write channels configuration
