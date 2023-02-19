@@ -274,8 +274,16 @@ class CommHandler:
             self._drop_all()
 
             # get info frame
+            timeout = 5
             while self._dev is None:
+                if timeout < 0:  # pragma: no cover
+                    msg = (
+                        "Failed to get device info, check"
+                        " your interface configuration"
+                    )
+                    raise TimeoutError(msg)
                 self._dev = self._devinfo_get()
+                timeout -= 1
 
             # initialize channels state
             self._channels_init(self._dev)
