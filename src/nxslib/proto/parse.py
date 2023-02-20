@@ -275,17 +275,11 @@ class Parser(ICommParse):
 
     def frame_is_ack(self, frame: DParseFrame) -> bool:
         """Return true if a given frame is ACK."""
-        if frame.fid == EParseId.ACK:
-            return True
-
-        return False
+        return frame.fid == EParseId.ACK
 
     def frame_is_stream(self, frame: DParseFrame) -> bool:
         """Return true if a given frame is STREAM."""
-        if frame.fid == EParseId.STREAM:
-            return True
-
-        return False
+        return frame.fid == EParseId.STREAM
 
     def frame_ack_decode(self, frame: DParseFrame) -> ParseAck | None:
         """Decode ACK frame."""
