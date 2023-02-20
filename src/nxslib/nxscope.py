@@ -62,8 +62,8 @@ class NxscopeHandler:
         """Make sure to disconnect from dev."""
         self.disconnect()
 
-    def _nxslib_start(self) -> bool:
-        """Send nxslib start request."""
+    def _stream_start(self) -> bool:
+        """Start stream request."""
         assert self._comm
 
         self._reset_stats()
@@ -74,8 +74,8 @@ class NxscopeHandler:
 
         return ret.state
 
-    def _nxslib_stop(self) -> bool:
-        """Send nxslib stop request."""
+    def _stream_stop(self) -> bool:
+        """Stop stream request."""
         assert self._comm
 
         ret = self._comm.stream_stop()
@@ -205,7 +205,7 @@ class NxscopeHandler:
             self.channels_write()
 
             # start request for nxslib
-            self._nxslib_start()
+            self._stream_start()
 
             # start stream thread
             self._thrd.thread_start()
@@ -218,7 +218,7 @@ class NxscopeHandler:
 
         if self._stream_started is True:
             # stop request for nxslib
-            self._nxslib_stop()
+            self._stream_stop()
 
             # stop stream thread
             self._thrd.thread_stop()
