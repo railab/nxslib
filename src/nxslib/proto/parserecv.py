@@ -37,7 +37,6 @@ class ParseRecv(ICommParseRecv):
         :param cb: recevier callbacks
         :param frame: instance of the frame parser
         """
-        assert isinstance(cb, ParseRecvCb)
         self._recv_cb = cb
         self._frame = frame()
         self._user_types = user_types

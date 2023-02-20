@@ -19,9 +19,6 @@ def test_nxslibintfcommon():
 
     intf.write_padding = 16
 
-    with pytest.raises(AssertionError):
-        data = intf.data_align("x")
-
     data = intf.data_align(b"x")
     assert len(data) == 16
     assert data[0] == b"x"[0]

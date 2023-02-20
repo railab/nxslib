@@ -212,9 +212,6 @@ class DeviceChannel:
             chan, _type, vdim, name, bool(en), div, mlen
         )
 
-        if func is not None:
-            assert isinstance(func, IDeviceChannelFunc)
-
         self._func = func
         self._cntr = 0
 
@@ -270,7 +267,6 @@ class Device:
         # all channels should have unique ids
         chanids = []
         for chan in channels:
-            assert isinstance(chan, DeviceChannel)
             chanids.append(chan.data.chan)
         assert len(set(chanids)) == len(chanids)
         # channels must mach chmax
