@@ -90,7 +90,7 @@ class ParseRecv(ICommParseRecv):
                 vect_scale_l = [x * decode.scale for x in sample.data]
             else:
                 # not scaled
-                vect_scale_l = [x for x in sample.data]
+                vect_scale_l = list(sample.data)
             _bytes = struct.pack(fmt, sample.chan, *vect_scale_l)
         elif decode.dtype == EParseDataType.CHAR:
             # string data
