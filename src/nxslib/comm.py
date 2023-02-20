@@ -198,6 +198,11 @@ class CommHandler:
             ret = self._get_frame(timeout=1.0)
             if ret:  # pragma: no cover
                 logger.info("INFO: drop frame %s", _)
+        for _ in range(3):
+            # TODO: revisit timeout
+            ret = self._get_stream_frame(timeout=1.0)
+            if ret:  # pragma: no cover
+                logger.info("INFO: drop frame %s", _)
 
     def _devinfo_get(self) -> Device | None:
         """Get nxslib dev info."""
