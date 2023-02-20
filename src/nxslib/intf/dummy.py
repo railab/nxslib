@@ -306,8 +306,8 @@ class DummyDev(ICommInterface):
             channels = DUMMY_DEV_CHANNELS
         assert channels
 
-        self._dev = Device(chmax, flags, rxpadding, channels)
-        self._dev_lock = Lock()
+        self._dummydev = Device(chmax, flags, rxpadding, channels)
+        self._dummydev_lock = Lock()
         self._stream_sleep = stream_sleep
         self._stream_snum = stream_snum
         self._qwrite: queue.Queue[bytes] = queue.Queue()
@@ -322,15 +322,15 @@ class DummyDev(ICommInterface):
     def _cmninfo_cb(self, data: bytes) -> None:
         assert self._parse
 
-        with self._dev_lock:
-            _bytes = self._parse.frame_cmninfo_encode(self._dev)
+        with self._dummydev_lock:
+            _bytes = self._parse.frame_cmninfo_encode(self._dummydev)
         self._qread.put(_bytes)
 
     def _chinfo_cb(self, data: bytes) -> None:
         assert self._parse
 
-        with self._dev_lock:
-            chan = self._dev.channel_get(data[0])
+        with self._dummydev_lock:
+            chan = self._dummydev.channel_get(data[0])
         assert chan
 
         _bytes = self._parse.frame_chinfo_encode(chan)
@@ -339,28 +339,28 @@ class DummyDev(ICommInterface):
     def _enable_cb(self, data: bytes) -> None:
         assert self._parse
 
-        with self._dev_lock:
-            enables = self._parse.frame_enable_decode(data, self._dev)
+        with self._dummydev_lock:
+            enables = self._parse.frame_enable_decode(data, self._dummydev)
             for chid, en in enumerate(enables):
-                chan = self._dev.channel_get(chid)
+                chan = self._dummydev.channel_get(chid)
                 assert chan
                 chan.en = en
 
-            if self._dev.ack_supported:
+            if self._dummydev.ack_supported:
                 _bytes = self._parse.frame_ack_encode(0)
                 self._qread.put(_bytes)
 
     def _div_cb(self, data: bytes) -> None:
         assert self._parse
 
-        with self._dev_lock:
-            dividers = self._parse.frame_div_decode(data, self._dev)
+        with self._dummydev_lock:
+            dividers = self._parse.frame_div_decode(data, self._dummydev)
             for chid, div in enumerate(dividers):
-                chan = self._dev.channel_get(chid)
+                chan = self._dummydev.channel_get(chid)
                 assert chan
                 chan.div = div
 
-            if self._dev.ack_supported:
+            if self._dummydev.ack_supported:
                 _bytes = self._parse.frame_ack_encode(0)
                 self._qread.put(_bytes)
 
@@ -375,20 +375,20 @@ class DummyDev(ICommInterface):
         else:
             self._thrd_stream.thread_stop()
 
-        with self._dev_lock:
+        with self._dummydev_lock:
             # send ACK after action
-            if self._dev.ack_supported:
+            if self._dummydev.ack_supported:
                 _bytes = self._parse.frame_ack_encode(0)
                 self._qread.put(_bytes)
 
     def _stream_data_get(self, snum: int) -> list[DParseStreamData]:
         samples = []
 
-        self._dev_lock.acquire()
+        self._dummydev_lock.acquire()
 
         for _ in range(snum):
-            for chid in range(self._dev.chmax):
-                chan = self._dev.channel_get(chid)
+            for chid in range(self._dummydev.chmax):
+                chan = self._dummydev.channel_get(chid)
                 assert chan
 
                 if chan.en is True:
@@ -404,7 +404,7 @@ class DummyDev(ICommInterface):
                         )
                         samples.append(sample)
 
-        self._dev_lock.release()
+        self._dummydev_lock.release()
         return samples
 
     def _thread_stream(self) -> None:
@@ -465,9 +465,9 @@ class DummyDev(ICommInterface):
         )
         self._parse = ParseRecv(recv_cb)
 
-        with self._dev_lock:
+        with self._dummydev_lock:
             # reset dev state
-            self._dev.reset()
+            self._dummydev.reset()
 
         self._thrd_recv.thread_start()
 
