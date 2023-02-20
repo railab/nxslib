@@ -1,5 +1,3 @@
-import pytest  # type: ignore
-
 from nxslib.dev import DDeviceChannelFuncData, DeviceChannel
 from nxslib.intf.dummy import (
     ChannelFunc0,
@@ -37,10 +35,6 @@ def test_nxslibdummy_init():
     d.drop_all()
     d.start()
     assert d.read() == b""
-
-    # write method requires bytes data
-    with pytest.raises(AssertionError):
-        d.write("aaa")
 
     d.write(b"aaaa")
     d.stop()

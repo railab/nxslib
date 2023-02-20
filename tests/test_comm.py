@@ -8,17 +8,8 @@ from nxslib.proto.parse import Parser
 
 
 def test_nxslib_init():
-    with pytest.raises(AssertionError):
-        comm = CommHandler(None, None)
-
     i = DummyDev()
     p = Parser()
-
-    with pytest.raises(AssertionError):
-        comm = CommHandler(i, None)
-
-    with pytest.raises(AssertionError):
-        comm = CommHandler(None, p)
 
     comm = CommHandler(i, p)
     assert isinstance(comm, CommHandler)

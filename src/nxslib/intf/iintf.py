@@ -46,8 +46,6 @@ class CommInterfaceCommon:
 
         :param data: bytes to be aligned
         """
-        assert isinstance(data, bytes)
-
         if self._write_padding:
             modlen = len(data) % self._write_padding
             if modlen:
@@ -69,7 +67,6 @@ class CommInterfaceCommon:
 
         :param data: bytes to send
         """
-        assert isinstance(data, bytes)
         # align data
         data = self.data_align(data)
         logger.debug("write=%s", data)

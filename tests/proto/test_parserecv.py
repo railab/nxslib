@@ -35,15 +35,6 @@ def cb_start(data):
 
 
 def test_nxslibparserecv_fames():
-    # invalid recv_cb
-    recv_cb = {}
-    with pytest.raises(AssertionError):
-        recv = ParseRecv(recv_cb, SerialFrame)
-
-    recv_cb = {"test": cb_cmninfo}
-    with pytest.raises(AssertionError):
-        recv = ParseRecv(recv_cb, SerialFrame)
-
     recv_cb = ParseRecvCb(cb_cmninfo, cb_chinfo, cb_enable, cb_div, cb_start)
     recv = ParseRecv(recv_cb, SerialFrame)
     assert isinstance(recv, ParseRecv)

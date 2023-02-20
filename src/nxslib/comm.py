@@ -4,9 +4,9 @@ import copy
 import queue
 from dataclasses import dataclass
 from threading import Lock
+from typing import TYPE_CHECKING
 
 from nxslib.dev import Device, DeviceChannel
-from nxslib.intf.iintf import ICommInterface
 from nxslib.logger import logger
 from nxslib.proto.iframe import DParseFrame, DParseHdr, EParseError
 from nxslib.proto.iparse import (
@@ -17,6 +17,9 @@ from nxslib.proto.iparse import (
     ParseCmninfo,
 )
 from nxslib.thread import ThreadCommon
+
+if TYPE_CHECKING:
+    from nxslib.intf.iintf import ICommInterface
 
 ###############################################################################
 # Class: DCommChannelsData
@@ -41,7 +44,7 @@ class DCommChannelsData:
 class CommHandler:
     """A class implementing the Nxslib communication glue logic."""
 
-    def __init__(self, intf: ICommInterface, parse: ICommParse):
+    def __init__(self, intf: "ICommInterface", parse: ICommParse):
         """Initialize communication glue logic.
 
         :param intf: instance of a communication interface
@@ -51,9 +54,6 @@ class CommHandler:
         self._started = False
 
         self._thrd = ThreadCommon(self._recv_thread, name="recv")
-
-        assert isinstance(intf, ICommInterface)
-        assert isinstance(parse, ICommParse)
 
         self._intf = intf
         self._parse = parse

@@ -70,10 +70,6 @@ def test_devchanneldata():
 
 # test channel init
 def test_nxsdevchannel_init():
-    # func must be callable or None
-    with pytest.raises(AssertionError):
-        DeviceChannel(1, 2, 3, "chan0", func=1)
-
     ch = DeviceChannel(0, 0, 0, None, func=None)
     assert isinstance(ch, DeviceChannel)
     assert ch.data.chan == 0
@@ -164,8 +160,6 @@ def test_nxsdev_init():
     # channels must be defined
     with pytest.raises(AssertionError):
         d = Device(1, 0, 0, [])
-    with pytest.raises(AssertionError):
-        d = Device(1, 0, 0, [1])
     # the same channel ids
     with pytest.raises(AssertionError):
         d = Device(
