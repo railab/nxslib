@@ -205,7 +205,6 @@ class DeviceChannel:
         :param mlen: size of the channel metadata
         :param func: function used to get data from the channel
         """
-        # assert isinstance(en, bool) # TODO: fixme
         # force name to be string
         if not name:
             name = ""

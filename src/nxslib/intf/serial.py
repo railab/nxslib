@@ -53,8 +53,8 @@ class SerialDevice(ICommInterface):
         assert self._ser
         try:
             return self._ser.read(self._ser.in_waiting)  # type: ignore
-        except serial.SerialException as e:
-            logger.debug("SerialException ignored:", str(e))
+        except serial.SerialException as exc:
+            logger.debug("SerialException ignored: %s", str(exc))
             return b""
 
     def _write(self, data: bytes) -> None:
