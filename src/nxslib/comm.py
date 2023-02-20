@@ -115,7 +115,7 @@ class CommHandler:
     def _get_ack(self, timeout: float = 1.0) -> ParseAck:
         """Get ACK response."""
         # return ACK if ACK frames not supported or we don't know yet
-        if self.dev is None or not self.dev.ack_supported:
+        if self.dev is None or not self.dev.data.ack_supported:
             return ParseAck(True, 0)
 
         frame = self._get_frame(timeout)
@@ -304,7 +304,7 @@ class CommHandler:
         """Channel enable."""
         assert self.dev
 
-        fwrite = self._parse.frame_enable(enable, self.dev.chmax)
+        fwrite = self._parse.frame_enable(enable, self.dev.data.chmax)
         self._intf.write(fwrite)
 
         ack = self._get_ack(timeout=1.0)
@@ -314,7 +314,7 @@ class CommHandler:
         """Channel divider."""
         assert self.dev
 
-        fwrite = self._parse.frame_div(div, self.dev.chmax)
+        fwrite = self._parse.frame_div(div, self.dev.data.chmax)
         self._intf.write(fwrite)
 
         ack = self._get_ack(timeout=1.0)
@@ -479,7 +479,7 @@ class CommHandler:
         :param dev: Nxscope device instance
         """
         assert self.dev
-        if self.dev.div_supported:
+        if self.dev.data.div_supported:
             # send div request
             self._nxslib_channels_div()
 
@@ -527,7 +527,7 @@ class CommHandler:
         if div < 0 or div > 255:
             raise ValueError
 
-        if not self.dev.div_supported and div > 0:
+        if not self.dev.data.div_supported and div > 0:
             logger.error("divider not supported by device !")
 
         with self._channels_lock:
@@ -542,13 +542,13 @@ class CommHandler:
     def ch_enable_all(self) -> None:
         """Enable all channels."""
         assert self.dev
-        for chan in range(self.dev.chmax):
+        for chan in range(self.dev.data.chmax):
             self.ch_enable(chan)
 
     def ch_disable_all(self) -> None:
         """Disale all channels."""
         assert self.dev
-        for chan in range(self.dev.chmax):
+        for chan in range(self.dev.data.chmax):
             self.ch_disable(chan)
 
     def ch_is_enabled(self, chan: int) -> bool:

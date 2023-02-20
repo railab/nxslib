@@ -179,23 +179,23 @@ class Parser(ICommParse):
             i += 1
 
             # decode meta data
-            meta = msfmt_get(chan.mlen)
+            meta = msfmt_get(chan.data.mlen)
 
             # decode sample type
-            decode = dsfmt_get(chan.dtype, self._user_types)
+            decode = dsfmt_get(chan.data.dtype, self._user_types)
             if decode.user:  # pragma: no cover
                 # NxScope compatibility:
                 #   real type size is determined with vdim, not by slen
-                assert struct.calcsize("<" + decode.dsfmt) == chan.vdim
+                assert struct.calcsize("<" + decode.dsfmt) == chan.data.vdim
 
             # data always packed as little-endian
             sfmt = "<"
-            if chan.vdim and not decode.user:
-                sfmt += str(chan.vdim)
+            if chan.data.vdim and not decode.user:
+                sfmt += str(chan.data.vdim)
             sfmt += decode.dsfmt
 
             # unpack data
-            offset = decode.slen * chan.vdim
+            offset = decode.slen * chan.data.vdim
             unpacked = struct.unpack(sfmt, frame.data[i : i + offset])
             i += offset
 
@@ -204,16 +204,16 @@ class Parser(ICommParse):
 
             # unpack metadata
             sfmt = "<" + meta
-            offset = chan.mlen
+            offset = chan.data.mlen
             mdata = struct.unpack(sfmt, frame.data[i : i + offset])
             i += offset
 
             # sample
             sample = DParseStreamData(
-                chan=chan.chan,
+                chan=chan.data.chan,
                 dtype=decode.dtype,
-                vdim=chan.vdim,
-                mlen=chan.mlen,
+                vdim=chan.data.vdim,
+                mlen=chan.data.mlen,
                 data=retdata,
                 meta=mdata,
             )

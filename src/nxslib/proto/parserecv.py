@@ -47,7 +47,9 @@ class ParseRecv(ICommParseRecv):
         _bytes = b""
 
         # general info
-        _bytes = struct.pack("BBB", dev.chmax, dev.flags, dev.rxpadding)
+        _bytes = struct.pack(
+            "BBB", dev.data.chmax, dev.data.flags, dev.data.rxpadding
+        )
 
         return _bytes
 
@@ -56,15 +58,15 @@ class ParseRecv(ICommParseRecv):
         _bytes = b""
 
         # chan info
-        nlen = len(chan.name)
+        nlen = len(chan.data.name)
         _bytes += struct.pack(
             f"?BBBB{nlen}s",
-            chan.en,
-            chan.dtype,
-            chan.vdim,
-            chan.div,
-            chan.mlen,
-            bytes(chan.name, "utf-8"),
+            chan.data.en,
+            chan.data.dtype,
+            chan.data.vdim,
+            chan.data.div,
+            chan.data.mlen,
+            bytes(chan.data.name, "utf-8"),
         )
 
         return _bytes
@@ -196,8 +198,8 @@ class ParseRecv(ICommParseRecv):
         flags, chan = self.frame_set_decode(data[:2])
 
         if flags == EParseIdSetFlags.BULK.value:
-            fmt = str(dev.chmax) + "?"
-            ret = list(struct.unpack(fmt, data[2 : 2 + dev.chmax]))
+            fmt = str(dev.data.chmax) + "?"
+            ret = list(struct.unpack(fmt, data[2 : 2 + dev.data.chmax]))
         elif flags == EParseIdSetFlags.SINGLE.value:
             fmt = "?"
             en = struct.unpack(fmt, data[2:3])[0]
@@ -206,7 +208,7 @@ class ParseRecv(ICommParseRecv):
         elif flags == EParseIdSetFlags.ALL.value:
             fmt = "?"
             en = struct.unpack(fmt, data[2:3])[0]
-            ret = [en for i in range(dev.chmax)]
+            ret = [en for i in range(dev.data.chmax)]
         else:
             raise ValueError
 
@@ -218,8 +220,8 @@ class ParseRecv(ICommParseRecv):
         flags, chan = self.frame_set_decode(data[:2])
 
         if flags == EParseIdSetFlags.BULK.value:
-            fmt = str(dev.chmax) + "b"
-            ret = list(struct.unpack(fmt, data[2 : 2 + dev.chmax]))
+            fmt = str(dev.data.chmax) + "b"
+            ret = list(struct.unpack(fmt, data[2 : 2 + dev.data.chmax]))
         elif flags == EParseIdSetFlags.SINGLE.value:
             fmt = "b"
             div = struct.unpack(fmt, data[2:3])[0]
@@ -228,7 +230,7 @@ class ParseRecv(ICommParseRecv):
         elif flags == EParseIdSetFlags.ALL.value:
             fmt = "b"
             div = struct.unpack(fmt, data[2:3])[0]
-            ret = [div for i in range(dev.chmax)]
+            ret = [div for i in range(dev.data.chmax)]
         else:
             raise ValueError
 

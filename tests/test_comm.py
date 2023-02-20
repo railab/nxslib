@@ -63,7 +63,7 @@ def test_nxslib_channels(comm):
     # default configuration
     comm.channels_default_cfg()
     comm.channels_write()
-    for chan in range(comm.dev.chmax):
+    for chan in range(comm.dev.data.chmax):
         assert comm.ch_is_enabled(chan) is False
         assert comm.ch_div_get(chan) == 0
 
@@ -80,7 +80,7 @@ def test_nxslib_channels(comm):
     # enable all channels
     comm.ch_enable_all()
     comm.channels_write()
-    for chan in range(comm.dev.chmax):
+    for chan in range(comm.dev.data.chmax):
         assert comm.ch_is_enabled(chan) is True
         assert comm.ch_div_get(chan) == 0
 
