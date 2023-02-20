@@ -52,7 +52,7 @@ def test_nxslib_connect():
     nxslib.connect()
 
     assert nxslib.dev is not None
-    for chan in range(nxslib.dev.chmax):
+    for chan in range(nxslib.dev.data.chmax):
         assert nxslib.dev_channel_get(chan) is not None
 
     # disconnect
@@ -97,7 +97,7 @@ def test_nxslib_stream():
     nxslib.stream_start()
 
     # channels disabled
-    for ch in range(comm.dev.chmax):
+    for ch in range(comm.dev.data.chmax):
         assert comm.ch_is_enabled(ch) is False
 
     # wait for data but channels no enabled
@@ -174,12 +174,12 @@ def test_nxslib_channels_runtime():
     dev1 = nxslib.dev_channel_get(1)
     dev2 = nxslib.dev_channel_get(2)
 
-    assert dev0.en is False
-    assert dev1.en is False
-    assert dev2.en is False
-    assert dev0.div == 0
-    assert dev1.div == 0
-    assert dev2.div == 0
+    assert dev0.data.en is False
+    assert dev1.data.en is False
+    assert dev2.data.en is False
+    assert dev0.data.div == 0
+    assert dev1.data.div == 0
+    assert dev2.data.div == 0
 
     # subscribe to streams
     q0 = nxslib.stream_sub(0)
@@ -193,12 +193,12 @@ def test_nxslib_channels_runtime():
 
     nxslib.channels_default_cfg(writenow=True)
 
-    assert dev0.en is False
-    assert dev1.en is False
-    assert dev2.en is False
-    assert dev0.div == 0
-    assert dev1.div == 0
-    assert dev2.div == 0
+    assert dev0.data.en is False
+    assert dev1.data.en is False
+    assert dev2.data.en is False
+    assert dev0.data.div == 0
+    assert dev1.data.div == 0
+    assert dev2.data.div == 0
 
     # wait for data but channels no enabled
     with pytest.raises(queue.Empty):
@@ -212,12 +212,12 @@ def test_nxslib_channels_runtime():
     nxslib.ch_enable(0, writenow=True)
     nxslib.ch_divider(0, 1, writenow=True)
 
-    assert dev0.en is True
-    assert dev1.en is False
-    assert dev2.en is False
-    assert dev0.div == 1
-    assert dev1.div == 0
-    assert dev2.div == 0
+    assert dev0.data.en is True
+    assert dev1.data.en is False
+    assert dev2.data.en is False
+    assert dev0.data.div == 1
+    assert dev1.data.div == 0
+    assert dev2.data.div == 0
 
     # wait for data
     data = q0.get(block=True, timeout=0.5)
@@ -231,12 +231,12 @@ def test_nxslib_channels_runtime():
     nxslib.ch_enable(1, writenow=True)
     nxslib.ch_divider(1, 5, writenow=True)
 
-    assert dev0.en is True
-    assert dev1.en is True
-    assert dev2.en is False
-    assert dev0.div == 1
-    assert dev1.div == 5
-    assert dev2.div == 0
+    assert dev0.data.en is True
+    assert dev1.data.en is True
+    assert dev2.data.en is False
+    assert dev0.data.div == 1
+    assert dev1.data.div == 5
+    assert dev2.data.div == 0
 
     # wait for data
     data = q0.get(block=True, timeout=0.5)
@@ -252,12 +252,12 @@ def test_nxslib_channels_runtime():
     nxslib.ch_enable(1, writenow=True)
     nxslib.ch_divider(1, 10, writenow=True)
 
-    assert dev0.en is False
-    assert dev1.en is True
-    assert dev2.en is False
-    assert dev0.div == 0
-    assert dev1.div == 10
-    assert dev2.div == 0
+    assert dev0.data.en is False
+    assert dev1.data.en is True
+    assert dev2.data.en is False
+    assert dev0.data.div == 0
+    assert dev1.data.div == 10
+    assert dev2.data.div == 0
 
     nxslib.ch_enable(0, writenow=True)
     nxslib.ch_divider(0, 5, writenow=True)
@@ -266,12 +266,12 @@ def test_nxslib_channels_runtime():
     nxslib.ch_enable(2, writenow=True)
     nxslib.ch_divider(2, 5, writenow=True)
 
-    assert dev0.en is True
-    assert dev1.en is True
-    assert dev2.en is True
-    assert dev0.div == 5
-    assert dev1.div == 5
-    assert dev2.div == 5
+    assert dev0.data.en is True
+    assert dev1.data.en is True
+    assert dev2.data.en is True
+    assert dev0.data.div == 5
+    assert dev1.data.div == 5
+    assert dev2.data.div == 5
 
     # get more data
     for _ in range(100):
@@ -309,9 +309,9 @@ def thread1(nxslib, inst):
     nxslib.ch_enable(2)
     nxslib.channels_write()
 
-    assert dev0.en is True
-    assert dev1.en is True
-    assert dev2.en is True
+    assert dev0.data.en is True
+    assert dev1.data.en is True
+    assert dev2.data.en is True
 
     # subscribe to streams
     q0 = nxslib.stream_sub(0)
@@ -355,12 +355,12 @@ def test_nxslib_channels_thread():
     dev1 = nxslib.dev_channel_get(1)
     dev2 = nxslib.dev_channel_get(2)
 
-    assert dev0.en is False
-    assert dev1.en is False
-    assert dev2.en is False
-    assert dev0.div == 0
-    assert dev1.div == 0
-    assert dev2.div == 0
+    assert dev0.data.en is False
+    assert dev1.data.en is False
+    assert dev2.data.en is False
+    assert dev0.data.div == 0
+    assert dev1.data.div == 0
+    assert dev2.data.div == 0
 
     # subscribe to streams
     q0 = nxslib.stream_sub(0)
@@ -378,9 +378,9 @@ def test_nxslib_channels_thread():
     nxslib.ch_divider(3, 3)
     nxslib.channels_write()
 
-    assert dev0.en is True
-    assert dev1.en is True
-    assert dev2.en is True
+    assert dev0.data.en is True
+    assert dev1.data.en is True
+    assert dev2.data.en is True
 
     # start stream without channels configured
     nxslib.stream_start()

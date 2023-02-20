@@ -344,9 +344,9 @@ class DummyDev(ICommInterface):
             for chid, en in enumerate(enables):
                 chan = self._dummydev.channel_get(chid)
                 assert chan
-                chan.en = en
+                chan.data.en = en
 
-            if self._dummydev.ack_supported:
+            if self._dummydev.data.ack_supported:
                 _bytes = self._parse.frame_ack_encode(0)
                 self._qread.put(_bytes)
 
@@ -358,9 +358,9 @@ class DummyDev(ICommInterface):
             for chid, div in enumerate(dividers):
                 chan = self._dummydev.channel_get(chid)
                 assert chan
-                chan.div = div
+                chan.data.div = div
 
-            if self._dummydev.ack_supported:
+            if self._dummydev.data.ack_supported:
                 _bytes = self._parse.frame_ack_encode(0)
                 self._qread.put(_bytes)
 
@@ -377,7 +377,7 @@ class DummyDev(ICommInterface):
 
         with self._dummydev_lock:
             # send ACK after action
-            if self._dummydev.ack_supported:
+            if self._dummydev.data.ack_supported:
                 _bytes = self._parse.frame_ack_encode(0)
                 self._qread.put(_bytes)
 
@@ -386,18 +386,18 @@ class DummyDev(ICommInterface):
 
         with self._dummydev_lock:
             for _ in range(snum):
-                for chid in range(self._dummydev.chmax):
+                for chid in range(self._dummydev.data.chmax):
                     chan = self._dummydev.channel_get(chid)
                     assert chan
 
-                    if chan.en is True:
+                    if chan.data.en is True:
                         data = chan.data_get()
                         if data:
                             sample = DParseStreamData(
                                 chan=chid,
-                                dtype=chan.dtype,
-                                vdim=chan.vdim,
-                                mlen=chan.mlen,
+                                dtype=chan.data.dtype,
+                                vdim=chan.data.vdim,
+                                mlen=chan.data.mlen,
                                 data=data.data,
                                 meta=data.meta,
                             )

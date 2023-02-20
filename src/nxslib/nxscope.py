@@ -94,7 +94,7 @@ class NxscopeHandler:
         assert self._comm
         assert self.dev
 
-        chmax = self.dev.chmax
+        chmax = self.dev.data.chmax
 
         # get stream data
         sdata = self._nxslib_stream()
@@ -162,7 +162,7 @@ class NxscopeHandler:
 
         # create lists for samples queues
         assert self.dev
-        self._sub_q = [[] for _ in range(self.dev.chmax)]
+        self._sub_q = [[] for _ in range(self.dev.data.chmax)]
         self._connected = True
 
         return self._comm.dev

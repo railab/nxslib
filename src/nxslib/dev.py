@@ -87,6 +87,7 @@ class DDeviceChannelData:
     critical: bool = field(init=False)
     is_valid: bool = field(init=False)
     is_numerical: bool = field(init=False)
+    _initdone: bool = field(default=False, init=False, repr=False)
 
     def __post_init__(self) -> None:
         """Post-init processing."""
@@ -100,6 +101,15 @@ class DDeviceChannelData:
             EDeviceChannelType.CHAR.value,
             EDeviceChannelType.WCHAR.value,
         ]
+        self._initdone = True
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Make some field read-only."""
+        if self._initdone:
+            if name not in ["div", "en"]:
+                msg = name + " proprety is read-only"
+                raise TypeError(msg)
+        self.__dict__[name] = value
 
 
 ###############################################################################
@@ -114,9 +124,9 @@ class DDeviceData:
     chmax: int
     flags: int
     rxpadding: int
-    channels: list["DeviceChannel"]
     div_supported: bool = field(init=False)
     ack_supported: bool = field(init=False)
+    _initdone: bool = field(default=False, init=False)
 
     def __post_init__(self) -> None:
         """Post-init processing."""
@@ -124,6 +134,15 @@ class DDeviceData:
             self.flags & EDeviceFlags.DIVIDER_SUPPORT.value
         )
         self.ack_supported = bool(self.flags & EDeviceFlags.ACK_SUPPORT.value)
+        self._initdone = True
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Make some field read-only."""
+        if self._initdone:
+            # all fields read-only
+            msg = name + " proprety is read-only"
+            raise TypeError(msg)
+        self.__dict__[name] = value
 
 
 ###############################################################################
@@ -161,7 +180,7 @@ class IDeviceChannelFunc(ABC):
 ###############################################################################
 
 
-class DeviceChannel(DDeviceChannelData):
+class DeviceChannel:
     """A class used to represent a nxslib device channel."""
 
     def __init__(
@@ -187,35 +206,28 @@ class DeviceChannel(DDeviceChannelData):
         :param func: function used to get data from the channel
         """
         # assert isinstance(en, bool) # TODO: fixme
-        super().__init__(chan, _type, vdim, name, bool(en), div, mlen)
+        # force name to be string
+        if not name:
+            name = ""
+        self._data = DDeviceChannelData(
+            chan, _type, vdim, name, bool(en), div, mlen
+        )
 
         if func is not None:
             assert isinstance(func, IDeviceChannelFunc)
 
-        # force name to be string
-        if not self.name:
-            self.name = ""
-
         self._func = func
-
         self._cntr = 0
 
     def __str__(self) -> str:
         """Get channel string represenation."""
-        _str = (
-            "DeviceChannel "
-            + "("
-            + "chan:"
-            + str(self.chan)
-            + " _type:"
-            + str(self._type)
-            + " vdim:"
-            + str(self.vdim)
-            + " name:"
-            + str(self.name)
-            + ")"
-        )
+        _str = "DeviceChannel " + "(" + str(self.data) + ")"
         return _str
+
+    @property
+    def data(self) -> DDeviceChannelData:
+        """Get channel specific data."""
+        return self._data
 
     def reset(self) -> None:
         """Reset channel state."""
@@ -239,7 +251,7 @@ class DeviceChannel(DDeviceChannelData):
 ###############################################################################
 
 
-class Device(DDeviceData):
+class Device:
     """A class used to represent a nxslib device."""
 
     def __init__(
@@ -260,38 +272,34 @@ class Device(DDeviceData):
         chanids = []
         for chan in channels:
             assert isinstance(chan, DeviceChannel)
-            chanids.append(chan.chan)
+            chanids.append(chan.data.chan)
         assert len(set(chanids)) == len(chanids)
+        # channels must mach chmax
+        assert len(channels) == chmax
 
         # initialize data
-        super().__init__(chmax, flags, rxpadding, channels)
+        self._data = DDeviceData(chmax, flags, rxpadding)
 
-        # channels must mach chmax
-        assert len(self.channels) == self.chmax
+        self._channels = channels
 
         self._channels_lock = Lock()
 
     def __str__(self) -> str:
         """Get device string represenation."""
-        _str = (
-            "Device:"
-            + " (chmax:"
-            + str(self.chmax)
-            + " flags:"
-            + str(self.flags)
-            + " rxpadding:"
-            + str(self.rxpadding)
-            + ")"
-        )
-        return _str
+        return "Device:" + " (" + str(self.data) + ")"
+
+    @property
+    def data(self) -> DDeviceData:
+        """Get device specific data."""
+        return self._data
 
     @property
     def channels_en(self) -> list[bool]:
         """Get channels enable state."""
         ret = []
         with self._channels_lock:
-            for chan in self.channels:
-                ret.append(chan.en)
+            for chan in self._channels:
+                ret.append(chan.data.en)
         return ret
 
     @property
@@ -299,28 +307,28 @@ class Device(DDeviceData):
         """Get channels divider state."""
         ret = []
         with self._channels_lock:
-            for chan in self.channels:
-                ret.append(chan.div)
+            for chan in self._channels:
+                ret.append(chan.data.div)
         return ret
 
     def div_channels_update(self, div: list[int]) -> None:
         """Update div state for channels."""
         with self._channels_lock:
-            assert len(div) == len(self.channels)
+            assert len(div) == len(self._channels)
             for i, chdiv in enumerate(div):
-                self.channels[i].div = chdiv
+                self._channels[i].data.div = chdiv
 
     def en_channels_update(self, en: list[bool]) -> None:
         """Update enable state for channels."""
         with self._channels_lock:
-            assert len(en) == len(self.channels)
+            assert len(en) == len(self._channels)
             for i, chen in enumerate(en):
-                self.channels[i].en = chen
+                self._channels[i].data.en = chen
 
     def reset(self) -> None:
         """Reset device state."""
         with self._channels_lock:
-            for chan in self.channels:
+            for chan in self._channels:
                 # reset channels
                 chan.reset()
 
@@ -331,6 +339,6 @@ class Device(DDeviceData):
         """
         try:
             with self._channels_lock:
-                return self.channels[chid]
+                return self._channels[chid]
         except IndexError:
             return None
