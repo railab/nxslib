@@ -1,4 +1,5 @@
 import queue
+import threading
 
 import pytest  # type: ignore
 
@@ -138,6 +139,11 @@ def test_nxslib_stream():
     print(data[0])
     assert data
 
+    # get more data
+    for _ in range(100):
+        assert q0_0.get(block=True, timeout=1)
+        assert q0_1.get(block=True, timeout=1)
+
     # stop stream
     nxslib.stream_stop()
 
@@ -267,12 +273,139 @@ def test_nxslib_channels_runtime():
     assert dev1.div == 5
     assert dev2.div == 5
 
+    # get more data
+    for _ in range(100):
+        _ = q0.get(block=True, timeout=1)
+        _ = q1.get(block=True, timeout=1)
+        _ = q2.get(block=True, timeout=1)
+
     # stop stream
     nxslib.stream_stop()
 
     nxslib.stream_unsub(q0)
     nxslib.stream_unsub(q1)
     nxslib.stream_unsub(q2)
+
+    # disconnect
+    nxslib.disconnect()
+
+
+stream_started = threading.Event()
+stream_stop = threading.Event()
+
+
+def thread1(nxslib, inst):
+    # wait for stream started
+    stream_started.wait()
+
+    # get device handlers
+    dev0 = nxslib.dev_channel_get(0)
+    dev1 = nxslib.dev_channel_get(1)
+    dev2 = nxslib.dev_channel_get(2)
+
+    # make sure that channels enabled
+    nxslib.ch_enable(0)
+    nxslib.ch_enable(1)
+    nxslib.ch_enable(2)
+    nxslib.channels_write()
+
+    assert dev0.en is True
+    assert dev1.en is True
+    assert dev2.en is True
+
+    # subscribe to streams
+    q0 = nxslib.stream_sub(0)
+    q1 = nxslib.stream_sub(1)
+    q2 = nxslib.stream_sub(2)
+
+    # wait for stop request
+    while not stream_stop.is_set():
+        _ = q0.get(block=True, timeout=0.5)
+        _ = q1.get(block=True, timeout=0.5)
+        _ = q2.get(block=True, timeout=0.5)
+
+    nxslib.stream_unsub(q0)
+    nxslib.stream_unsub(q1)
+    nxslib.stream_unsub(q2)
+
+
+def test_nxslib_channels_thread():
+    intf = DummyDev()
+    parse = Parser()
+    comm = CommHandler(intf, parse)
+    nxslib = NxscopeHandler()
+
+    nxslib.intf_connect(comm)
+
+    thr1 = threading.Thread(target=thread1, args=[nxslib, 1])
+    thr1.start()
+    thr2 = threading.Thread(target=thread1, args=[nxslib, 2])
+    thr2.start()
+    thr3 = threading.Thread(target=thread1, args=[nxslib, 3])
+    thr3.start()
+
+    # connect
+    nxslib.connect()
+
+    # force default state
+    nxslib.channels_default_cfg(writenow=True)
+
+    # get device handlers
+    dev0 = nxslib.dev_channel_get(0)
+    dev1 = nxslib.dev_channel_get(1)
+    dev2 = nxslib.dev_channel_get(2)
+
+    assert dev0.en is False
+    assert dev1.en is False
+    assert dev2.en is False
+    assert dev0.div == 0
+    assert dev1.div == 0
+    assert dev2.div == 0
+
+    # subscribe to streams
+    q0 = nxslib.stream_sub(0)
+    q1 = nxslib.stream_sub(1)
+    q2 = nxslib.stream_sub(2)
+
+    nxslib.channels_default_cfg(writenow=True)
+
+    # configure channels
+    nxslib.ch_enable(0)
+    nxslib.ch_enable(1)
+    nxslib.ch_enable(2)
+    nxslib.ch_divider(1, 1)
+    nxslib.ch_divider(2, 2)
+    nxslib.ch_divider(3, 3)
+    nxslib.channels_write()
+
+    assert dev0.en is True
+    assert dev1.en is True
+    assert dev2.en is True
+
+    # start stream without channels configured
+    nxslib.stream_start()
+    stream_started.set()
+
+    # get more data
+    for _ in range(100):
+        _ = q0.get(block=True, timeout=0.5)
+        _ = q1.get(block=True, timeout=0.5)
+        _ = q2.get(block=True, timeout=0.5)
+
+    # stop threads
+    stream_stop.set()
+
+    # stop stream
+    nxslib.stream_stop()
+
+    nxslib.stream_unsub(q0)
+    nxslib.stream_unsub(q1)
+    nxslib.stream_unsub(q2)
+
+    # wait for threads
+    thr1.join()
+    thr2.join()
+    thr3.join()
 
     # disconnect
     nxslib.disconnect()
