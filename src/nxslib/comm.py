@@ -193,16 +193,16 @@ class CommHandler:
         return frame_decoded
 
     def _drop_all_frames(self) -> None:
-        for _ in range(3):
-            # TODO: revisit timeout
-            ret = self._get_frame(timeout=1.0)
-            if ret:  # pragma: no cover
-                logger.info("INFO: drop frame %s", _)
-        for _ in range(3):
-            # TODO: revisit timeout
-            ret = self._get_stream_frame(timeout=1.0)
-            if ret:  # pragma: no cover
-                logger.info("INFO: drop frame %s", _)
+        cntr = 4
+        while cntr > 0:
+            ret = self._get_frame(timeout=0.1)
+            if not ret:  # pragma: no cover
+                cntr -= 1
+        cntr = 4
+        while cntr > 0:
+            ret = self._get_stream_frame(timeout=0.1)
+            if not ret:  # pragma: no cover
+                cntr -= 1
 
     def _devinfo_get(self) -> Device | None:
         """Get nxslib dev info."""
