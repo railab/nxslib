@@ -346,9 +346,8 @@ class CommHandler:
         return self._parse.frame_chinfo_decode(fread, chan)
 
     def _nxslib_channels_enable(self) -> None:
-        assert self._channels
-        assert self.dev
         with self._channels_lock:
+            assert self._channels
             j = 0
             k = 0
             for i, _ in enumerate(self._channels.en_now):
@@ -367,14 +366,13 @@ class CommHandler:
 
             # update states
             self._channels.en_now = copy.deepcopy(self._channels.en_new)
+            assert self.dev
             self.dev.en_channels_update(self._channels.en_now)
 
     def _nxslib_channels_div(self) -> None:
         """Send nxslib div."""
-        assert self._channels
-        assert self.dev
-
         with self._channels_lock:
+            assert self._channels
             j = 0
             k = 0
             for i, _ in enumerate(self._channels.div_now):
@@ -393,12 +391,13 @@ class CommHandler:
 
             # update states
             self._channels.div_now = copy.deepcopy(self._channels.div_new)
+            assert self.dev
             self.dev.div_channels_update(self._channels.div_now)
 
     def _ch_divider_default(self) -> None:
         """Set all channels divider to default."""
-        assert self._channels
         with self._channels_lock:
+            assert self._channels
             for i, _ in enumerate(self._channels.div_new):
                 self._channels.div_new[i] = 0
 
@@ -491,8 +490,8 @@ class CommHandler:
 
         :param chans: single channel ID or a list with channels IDs
         """
-        assert self._channels
         with self._channels_lock:
+            assert self._channels
             if isinstance(chans, list):
                 for chan in chans:
                     self._channels.en_new[chan] = True
@@ -506,8 +505,8 @@ class CommHandler:
 
         :param chans: single channel ID or a list with channels IDs
         """
-        assert self._channels
         with self._channels_lock:
+            assert self._channels
             if isinstance(chans, list):
                 for chan in chans:
                     self._channels.en_new[chan] = False
@@ -522,15 +521,15 @@ class CommHandler:
         :param chans: single channel ID or a list with channels IDs
         :param div: divider value to be set
         """
-        assert self._channels
-        assert self.dev
         if div < 0 or div > 255:
             raise ValueError
 
+        assert self.dev
         if not self.dev.data.div_supported and div > 0:
             logger.error("divider not supported by device !")
 
         with self._channels_lock:
+            assert self._channels
             if isinstance(chans, list):
                 for chan in chans:
                     self._channels.div_new[chan] = div
@@ -556,8 +555,8 @@ class CommHandler:
 
         :param chan: channel ID
         """
-        assert self._channels
         with self._channels_lock:
+            assert self._channels
             return self._channels.en_now[chan]
 
     def ch_div_get(self, chan: int) -> int:
@@ -565,8 +564,8 @@ class CommHandler:
 
         :param chid: the channel ID
         """
-        assert self._channels
         with self._channels_lock:
+            assert self._channels
             return self._channels.div_now[chan]
 
     def channels_default_cfg(self) -> None:
