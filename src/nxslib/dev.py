@@ -1,7 +1,7 @@
 """Module containint NxScope the device implementation."""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from threading import Lock
 from typing import Any
@@ -67,6 +67,42 @@ class EDeviceFlags(Enum):
 
 
 ###############################################################################
+# Class: DDeviceChannelData
+###############################################################################
+
+
+@dataclass
+class DDeviceChannelData:
+    """A NxScope channel data."""
+
+    chan: int
+    _type: int
+    vdim: int
+    name: str
+    en: bool = False
+    div: int = 0
+    mlen: int = 0
+    dtype: int = field(init=False)
+    type_res: int = field(init=False)
+    critical: bool = field(init=False)
+    is_valid: bool = field(init=False)
+    is_numerical: bool = field(init=False)
+
+    def __post_init__(self) -> None:
+        """Post-init processing."""
+        self.dtype = self._type & 0x1F
+        self.critical = bool(self._type & 0x80)
+        self.type_res = self._type & 0x60
+        self.is_valid = self.dtype is not EDeviceChannelType.UNDEF.value
+        self.is_numerical = self.dtype not in [
+            EDeviceChannelType.UNDEF.value,
+            EDeviceChannelType.NONE.value,
+            EDeviceChannelType.CHAR.value,
+            EDeviceChannelType.WCHAR.value,
+        ]
+
+
+###############################################################################
 # Class: DDeviceData
 ###############################################################################
 
@@ -79,6 +115,15 @@ class DDeviceData:
     flags: int
     rxpadding: int
     channels: list["DeviceChannel"]
+    div_supported: bool = field(init=False)
+    ack_supported: bool = field(init=False)
+
+    def __post_init__(self) -> None:
+        """Post-init processing."""
+        self.div_supported = bool(
+            self.flags & EDeviceFlags.DIVIDER_SUPPORT.value
+        )
+        self.ack_supported = bool(self.flags & EDeviceFlags.ACK_SUPPORT.value)
 
 
 ###############################################################################
@@ -109,55 +154,6 @@ class IDeviceChannelFunc(ABC):
     @abstractmethod
     def get(self, cntr: int) -> DDeviceChannelFuncData | None:
         """Get channel stream data."""
-
-
-###############################################################################
-# Class: DDeviceChannelData
-###############################################################################
-
-
-@dataclass
-class DDeviceChannelData:
-    """A NxScope channel data."""
-
-    chan: int
-    _type: int
-    vdim: int
-    name: str
-    en: bool = False
-    div: int = 0
-    mlen: int = 0
-
-    @property
-    def dtype(self) -> int:
-        """Reserved for future use."""
-        return self._type & 0x1F
-
-    @property
-    def critical(self) -> bool:
-        """Return True if the channel is critical."""
-        return bool(self._type & 0x80)
-
-    @property
-    def type_res(self) -> int:
-        """Reserved for future use."""
-        return self._type & 0x60
-
-    @property
-    def is_valid(self) -> bool:
-        """Return True if the channel is valid (dtype should be defined)."""
-        return self.dtype is not EDeviceChannelType.UNDEF.value
-
-    @property
-    def is_numerical(self) -> bool:
-        """Return True if the channel is numerical."""
-        if not self.is_valid:
-            return False
-        return self.dtype not in [
-            EDeviceChannelType.NONE.value,
-            EDeviceChannelType.CHAR.value,
-            EDeviceChannelType.WCHAR.value,
-        ]
 
 
 ###############################################################################
@@ -288,16 +284,6 @@ class Device(DDeviceData):
             + ")"
         )
         return _str
-
-    @property
-    def div_supported(self) -> bool:
-        """Return True if divider is supported."""
-        return bool(self.flags & EDeviceFlags.DIVIDER_SUPPORT.value)
-
-    @property
-    def ack_supported(self) -> bool:
-        """Return True if ACK frames are supported."""
-        return bool(self.flags & EDeviceFlags.ACK_SUPPORT.value)
 
     @property
     def channels_en(self) -> list[bool]:
