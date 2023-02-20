@@ -331,9 +331,9 @@ class DummyDev(ICommInterface):
 
         with self._dummydev_lock:
             chan = self._dummydev.channel_get(data[0])
-        assert chan
+            assert chan
+            _bytes = self._parse.frame_chinfo_encode(chan)
 
-        _bytes = self._parse.frame_chinfo_encode(chan)
         self._qread.put(_bytes)
 
     def _enable_cb(self, data: bytes) -> None:
@@ -384,27 +384,24 @@ class DummyDev(ICommInterface):
     def _stream_data_get(self, snum: int) -> list[DParseStreamData]:
         samples = []
 
-        self._dummydev_lock.acquire()
+        with self._dummydev_lock:
+            for _ in range(snum):
+                for chid in range(self._dummydev.chmax):
+                    chan = self._dummydev.channel_get(chid)
+                    assert chan
 
-        for _ in range(snum):
-            for chid in range(self._dummydev.chmax):
-                chan = self._dummydev.channel_get(chid)
-                assert chan
-
-                if chan.en is True:
-                    data = chan.data_get()
-                    if data:
-                        sample = DParseStreamData(
-                            chan=chid,
-                            dtype=chan.dtype,
-                            vdim=chan.vdim,
-                            mlen=chan.mlen,
-                            data=data.data,
-                            meta=data.meta,
-                        )
-                        samples.append(sample)
-
-        self._dummydev_lock.release()
+                    if chan.en is True:
+                        data = chan.data_get()
+                        if data:
+                            sample = DParseStreamData(
+                                chan=chid,
+                                dtype=chan.dtype,
+                                vdim=chan.vdim,
+                                mlen=chan.mlen,
+                                data=data.data,
+                                meta=data.meta,
+                            )
+                            samples.append(sample)
         return samples
 
     def _thread_stream(self) -> None:
