@@ -21,7 +21,6 @@ from nxslib.proto.iparserecv import ParseRecvCb
 from nxslib.proto.parserecv import ParseRecv
 from nxslib.thread import ThreadCommon
 
-
 ###############################################################################
 # Dummy nxslib device
 ###############################################################################
