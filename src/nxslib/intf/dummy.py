@@ -429,7 +429,7 @@ class DummyDev(ICommInterface):
         try:
             # NOTE: timeout must be not zero otherwise we have
             #       deadlock when thread stop is requested
-            data = self._qwrite.get(block=True, timeout=0.01)
+            data = self._qwrite.get(block=True, timeout=1.0)
         except queue.Empty:
             pass
 
