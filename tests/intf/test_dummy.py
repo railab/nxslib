@@ -31,6 +31,9 @@ def test_nxslibdummy_init():
     d = DummyDev(1, 0, [DeviceChannel(0, 1, 0, "")])
     assert isinstance(d, DummyDev)
 
+    # stop without start
+    d.stop()
+
     # write padding
     d.drop_all()
     d.start()
