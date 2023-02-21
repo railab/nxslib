@@ -58,10 +58,6 @@ class NxscopeHandler:
 
         self._ovf_cntr: int = 0
 
-    def __del__(self) -> None:
-        """Make sure to disconnect from dev."""
-        self.disconnect()
-
     def _stream_start(self) -> bool:
         """Start stream request."""
         assert self._comm
