@@ -21,6 +21,7 @@ from nxslib.proto.iparserecv import ParseRecvCb
 from nxslib.proto.parserecv import ParseRecv
 from nxslib.thread import ThreadCommon
 
+
 ###############################################################################
 # Dummy nxslib device
 ###############################################################################
@@ -325,10 +326,6 @@ class DummyDev(ICommInterface):
 
         self._parse: ParseRecv | None = None
 
-    def __del__(self) -> None:
-        """Make sure that interface is stoped."""
-        self.stop()
-
     def _cmninfo_cb(self, data: bytes) -> None:
         assert self._parse
 
@@ -440,6 +437,7 @@ class DummyDev(ICommInterface):
     def stop(self) -> None:
         """Stop the interface."""
         logger.debug("Stop dummy interface")
+
         self._thrd_stream.thread_stop()
         self._thrd_recv.thread_stop()
 

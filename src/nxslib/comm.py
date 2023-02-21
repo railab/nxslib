@@ -70,10 +70,6 @@ class CommHandler:
         self._channels: DCommChannelsData
         self._channels_lock = Lock()
 
-    def __del__(self) -> None:
-        """Need to disconnect from the device."""
-        self.disconnect()
-
     def _drop_all(self) -> None:
         """Drop all frames."""
         self._intf.drop_all()
