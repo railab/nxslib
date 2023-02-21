@@ -4,7 +4,7 @@ import math
 import queue
 import random
 import time
-from threading import Lock
+from threading import Event, Lock
 
 from nxslib.dev import (
     DDeviceChannelFuncData,
@@ -321,6 +321,8 @@ class DummyDev(ICommInterface):
         self._qwrite: queue.Queue[bytes] = queue.Queue()
         self._qread: queue.Queue[bytes] = queue.Queue()
 
+        self._stream_started = Event()
+
         self._parse: ParseRecv | None = None
 
     def __del__(self) -> None:
@@ -379,9 +381,9 @@ class DummyDev(ICommInterface):
 
         # start/stop stream
         if start is True:
-            self._thrd_stream.thread_start()
+            self._stream_started.set()
         else:
-            self._thrd_stream.thread_stop()
+            self._stream_started.clear()
 
         with self._dummydev_lock:
             # send ACK after action
@@ -414,13 +416,12 @@ class DummyDev(ICommInterface):
 
     def _thread_stream(self) -> None:
         assert self._parse
-
-        samples = self._stream_data_get(self._stream_snum)
-        frame = self._parse.frame_stream_encode(samples)
-        if frame is not None:  # pragma: no cover
-            self._qread.put(frame)
-
-        time.sleep(self._stream_sleep)
+        if self._stream_started.wait(timeout=1.0):
+            samples = self._stream_data_get(self._stream_snum)
+            frame = self._parse.frame_stream_encode(samples)
+            if frame is not None:  # pragma: no cover
+                self._qread.put(frame)
+            time.sleep(self._stream_sleep)
 
     def _thread_recv(self) -> None:
         assert self._parse
@@ -475,6 +476,7 @@ class DummyDev(ICommInterface):
             self._dummydev.reset()
 
         self._thrd_recv.thread_start()
+        self._thrd_stream.thread_start()
 
     def drop_all(self) -> None:
         """Drop all frames."""
