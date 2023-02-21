@@ -171,6 +171,7 @@ class NxscopeHandler:
             self.stream_stop()
             # disconnect
             self._comm.disconnect()
+            self._connected = False
 
     def intf_connect(self, comm: "CommHandler") -> None:
         """Connect a NxScope communication handler.
