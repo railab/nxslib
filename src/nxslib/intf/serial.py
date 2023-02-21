@@ -13,7 +13,14 @@ from nxslib.logger import logger
 class SerialDevice(ICommInterface):
     """A class used to represent a serial port interface."""
 
-    def __init__(self, port: str, baud: int = 115200) -> None:
+    def __init__(
+        self,
+        port: str,
+        baud: int = 115200,
+        bytesize: int = 8,
+        parity: str = "N",
+        stopbits: int = 1,
+    ) -> None:
         """Intitialize a serial interface.
 
         :param port: path to the serial port device
@@ -21,7 +28,13 @@ class SerialDevice(ICommInterface):
         """
         try:
             self._ser = serial.Serial(
-                port, baud, timeout=1, bytesize=8, parity="N", stopbits=1
+                port,
+                baud,
+                timeout=1,
+                bytesize=bytesize,
+                parity=parity,
+                stopbits=stopbits,
+                write_timeout=1,
             )
         except Exception as exc:
             logger.error("Failed to open serial port: %s", str(exc))
