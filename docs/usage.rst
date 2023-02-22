@@ -170,15 +170,15 @@ Serial port interface
 
 You can use `socat` to connect to a simulated NuttX target:
 
-  .. code-block:: bash
+.. code-block:: bash
 
-     SERIAL_HOST={PATH}/ttyNX0
-     SERIAL_NUTTX={PATH}/ttySIM0
+   SERIAL_HOST={PATH}/ttyNX0
+   SERIAL_NUTTX={PATH}/ttySIM0
 
-     # run socat in background
-     socat PTY,link=$SERIAL_NUTTX PTY,link=$SERIAL_HOST &
-     stty -F $SERIAL_NUTTX raw
-     tty -F $SERIAL_HOST raw
-     stty -F $SERIAL_NUTTX 115200
-     stty -F $SERIAL_HOST 115200
+   # run socat in background
+   socat PTY,link=$SERIAL_NUTTX PTY,link=$SERIAL_HOST &
+   stty -F $SERIAL_NUTTX raw
+   tty -F $SERIAL_HOST raw
+   stty -F $SERIAL_NUTTX 115200
+   stty -F $SERIAL_HOST 115200
 
