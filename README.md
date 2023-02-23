@@ -16,11 +16,11 @@ connecting a real NuttX device
 
 ## Instalation
 
-For now, only installation from sources is available.
+Nxslib can be installed by running `pip install nxslib`.
 
-To install Nxslib locally from this repository, use:
+To install latest development version, use:
 
-`pip install --user git+https://github.com/railab/nxslib.git`
+`pip install git+https://github.com/railab/nxslib.git`
 
 ## Contributing
 
