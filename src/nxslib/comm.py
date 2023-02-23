@@ -83,14 +83,15 @@ class CommHandler:
         """Recv thread."""
         frame = self._read_frame()
         if frame:
-            if self.dev is None and self._parse.frame_is_ack(frame):
-                # drop ACK frames if we dont have dev info yet
-                pass
-            elif self._parse.frame_is_stream(frame):
+            if self._parse.frame_is_stream(frame):
                 # special queue for stream frames
                 self._q_stream.put(frame)
             else:
-                self._q.put(frame)
+                if self.dev is None and self._parse.frame_is_ack(frame):
+                    # drop ACK frames if we dont have dev info yet
+                    pass
+                else:
+                    self._q.put(frame)
 
     def _get_frame(self, timeout: float = 1.0) -> DParseFrame | None:
         """Get frame from queue."""
