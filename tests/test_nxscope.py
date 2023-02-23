@@ -3,102 +3,66 @@ import threading
 
 import pytest  # type: ignore
 
-from nxslib.comm import CommHandler
 from nxslib.intf.dummy import DummyDev
 from nxslib.nxscope import NxscopeHandler
 from nxslib.proto.parse import Parser
 
 
-def test_nxslib_init():
-    nxslib = NxscopeHandler()
-    assert isinstance(nxslib, NxscopeHandler)
-
-
-def test_nxslib_nointf():
-    nxslib = NxscopeHandler()
-
-    with pytest.raises(AttributeError):
-        _ = nxslib.dev_channel_get(0)
-    with pytest.raises(AttributeError):
-        nxslib.connect()
-    with pytest.raises(AttributeError):
-        nxslib.stream_start()
-    with pytest.raises(AttributeError):
-        nxslib.stream_stop()
-
-
-def test_nxslib_intf():
+def test_nxscope_connect():
     intf = DummyDev()
     parse = Parser()
-    comm = CommHandler(intf, parse)
-    nxslib = NxscopeHandler()
-
-    assert nxslib.intf_is_connected is False
-    nxslib.intf_connect(comm)
-    assert nxslib.intf_is_connected is True
-
-
-def test_nxslib_connect():
-    intf = DummyDev()
-    parse = Parser()
-    comm = CommHandler(intf, parse)
-    nxslib = NxscopeHandler()
-
-    nxslib.intf_connect(comm)
+    nxscope = NxscopeHandler(intf, parse)
 
     # connect
-    nxslib.connect()
+    nxscope.connect()
     # connect once agian
-    nxslib.connect()
+    nxscope.connect()
 
-    assert nxslib.dev is not None
-    for chan in range(nxslib.dev.data.chmax):
-        assert nxslib.dev_channel_get(chan) is not None
+    assert nxscope.dev is not None
+    for chan in range(nxscope.dev.data.chmax):
+        assert nxscope.dev_channel_get(chan) is not None
 
     # disconnect
-    nxslib.disconnect()
+    nxscope.disconnect()
     # disconnect once agian
-    nxslib.disconnect()
+    nxscope.disconnect()
 
-    assert nxslib.dev is None
+    assert nxscope.dev is None
     with pytest.raises(AssertionError):
-        _ = nxslib.dev_channel_get(0)
+        _ = nxscope.dev_channel_get(0)
 
 
-def test_nxslib_stream():
+def test_nxscope_stream():
     intf = DummyDev()
     parse = Parser()
-    comm = CommHandler(intf, parse)
-    nxslib = NxscopeHandler()
-
-    nxslib.intf_connect(comm)
+    nxscope = NxscopeHandler(intf, parse)
 
     # connect
-    nxslib.connect()
+    nxscope.connect()
 
     # start stream
-    nxslib.stream_start()
+    nxscope.stream_start()
     # start stream once again
-    nxslib.stream_start()
+    nxscope.stream_start()
 
     # stop stream
-    nxslib.stream_stop()
+    nxscope.stream_stop()
     # stop stream once again
-    nxslib.stream_stop()
+    nxscope.stream_stop()
 
     # subscribe to streams
-    q0_0 = nxslib.stream_sub(0)
-    q0_1 = nxslib.stream_sub(0)
+    q0_0 = nxscope.stream_sub(0)
+    q0_1 = nxscope.stream_sub(0)
 
-    # disable channels
-    comm.ch_disable_all()
+    # default configuratio
+    nxscope.channels_default_cfg()
 
     # start stream
-    nxslib.stream_start()
+    nxscope.stream_start()
 
     # channels disabled
-    for ch in range(comm.dev.data.chmax):
-        assert comm.ch_is_enabled(ch) is False
+    for ch in range(nxscope.dev.data.chmax):
+        assert nxscope._comm.ch_is_enabled(ch) is False
 
     # wait for data but channels no enabled
     with pytest.raises(queue.Empty):
@@ -107,27 +71,27 @@ def test_nxslib_stream():
         _ = q0_1.get(block=True, timeout=0.5)
 
     # stop stream
-    nxslib.stream_stop()
+    nxscope.stream_stop()
 
     # unsub from streams
-    nxslib.stream_unsub(q0_0)
-    nxslib.stream_unsub(q0_1)
+    nxscope.stream_unsub(q0_0)
+    nxscope.stream_unsub(q0_1)
 
     # configure channels
-    nxslib.channels_default_cfg()
+    nxscope.channels_default_cfg()
     # enable/disable
-    nxslib.ch_enable([0])
-    nxslib.ch_disable([0])
-    nxslib.ch_enable([0])
+    nxscope.ch_enable([0])
+    nxscope.ch_disable([0])
+    nxscope.ch_enable([0])
     # divider
-    nxslib.ch_divider([0], 1)
+    nxscope.ch_divider([0], 1)
 
     # subscribe to streams
-    q0_0 = nxslib.stream_sub(0)
-    q0_1 = nxslib.stream_sub(0)
+    q0_0 = nxscope.stream_sub(0)
+    q0_1 = nxscope.stream_sub(0)
 
     # start stream
-    nxslib.stream_start()
+    nxscope.stream_start()
 
     # wait for data but channels no enabled
     data = q0_0.get(block=True, timeout=1)
@@ -145,34 +109,31 @@ def test_nxslib_stream():
         assert q0_1.get(block=True, timeout=1)
 
     # stop stream
-    nxslib.stream_stop()
+    nxscope.stream_stop()
 
     # subscribe to streams
-    nxslib.stream_unsub(q0_0)
-    nxslib.stream_unsub(q0_1)
+    nxscope.stream_unsub(q0_0)
+    nxscope.stream_unsub(q0_1)
 
     # disconnect
-    nxslib.disconnect()
+    nxscope.disconnect()
 
 
-def test_nxslib_channels_runtime():
+def test_nxscope_channels_runtime():
     intf = DummyDev()
     parse = Parser()
-    comm = CommHandler(intf, parse)
-    nxslib = NxscopeHandler()
-
-    nxslib.intf_connect(comm)
+    nxscope = NxscopeHandler(intf, parse)
 
     # connect
-    nxslib.connect()
+    nxscope.connect()
 
     # force default state
-    nxslib.channels_default_cfg(writenow=True)
+    nxscope.channels_default_cfg(writenow=True)
 
     # get device handlers
-    dev0 = nxslib.dev_channel_get(0)
-    dev1 = nxslib.dev_channel_get(1)
-    dev2 = nxslib.dev_channel_get(2)
+    dev0 = nxscope.dev_channel_get(0)
+    dev1 = nxscope.dev_channel_get(1)
+    dev2 = nxscope.dev_channel_get(2)
 
     assert dev0.data.en is False
     assert dev1.data.en is False
@@ -182,16 +143,16 @@ def test_nxslib_channels_runtime():
     assert dev2.data.div == 0
 
     # subscribe to streams
-    q0 = nxslib.stream_sub(0)
-    q1 = nxslib.stream_sub(1)
-    q2 = nxslib.stream_sub(2)
+    q0 = nxscope.stream_sub(0)
+    q1 = nxscope.stream_sub(1)
+    q2 = nxscope.stream_sub(2)
 
-    nxslib.channels_default_cfg(writenow=True)
+    nxscope.channels_default_cfg(writenow=True)
 
     # start stream without channels configured
-    nxslib.stream_start()
+    nxscope.stream_start()
 
-    nxslib.channels_default_cfg(writenow=True)
+    nxscope.channels_default_cfg(writenow=True)
 
     assert dev0.data.en is False
     assert dev1.data.en is False
@@ -209,8 +170,8 @@ def test_nxslib_channels_runtime():
         _ = q2.get(block=True, timeout=0.5)
 
     # reconfig
-    nxslib.ch_enable(0, writenow=True)
-    nxslib.ch_divider(0, 1, writenow=True)
+    nxscope.ch_enable(0, writenow=True)
+    nxscope.ch_divider(0, 1, writenow=True)
 
     assert dev0.data.en is True
     assert dev1.data.en is False
@@ -228,8 +189,8 @@ def test_nxslib_channels_runtime():
         _ = q2.get(block=True, timeout=0.5)
 
     # reconfig
-    nxslib.ch_enable(1, writenow=True)
-    nxslib.ch_divider(1, 5, writenow=True)
+    nxscope.ch_enable(1, writenow=True)
+    nxscope.ch_divider(1, 5, writenow=True)
 
     assert dev0.data.en is True
     assert dev1.data.en is True
@@ -247,10 +208,10 @@ def test_nxslib_channels_runtime():
         _ = q2.get(block=True, timeout=0.5)
 
     # reconfig
-    nxslib.ch_disable(0, writenow=True)
-    nxslib.ch_divider(0, 0, writenow=True)
-    nxslib.ch_enable(1, writenow=True)
-    nxslib.ch_divider(1, 10, writenow=True)
+    nxscope.ch_disable(0, writenow=True)
+    nxscope.ch_divider(0, 0, writenow=True)
+    nxscope.ch_enable(1, writenow=True)
+    nxscope.ch_divider(1, 10, writenow=True)
 
     assert dev0.data.en is False
     assert dev1.data.en is True
@@ -259,12 +220,12 @@ def test_nxslib_channels_runtime():
     assert dev1.data.div == 10
     assert dev2.data.div == 0
 
-    nxslib.ch_enable(0, writenow=True)
-    nxslib.ch_divider(0, 5, writenow=True)
-    nxslib.ch_enable(1, writenow=True)
-    nxslib.ch_divider(1, 5, writenow=True)
-    nxslib.ch_enable(2, writenow=True)
-    nxslib.ch_divider(2, 5, writenow=True)
+    nxscope.ch_enable(0, writenow=True)
+    nxscope.ch_divider(0, 5, writenow=True)
+    nxscope.ch_enable(1, writenow=True)
+    nxscope.ch_divider(1, 5, writenow=True)
+    nxscope.ch_enable(2, writenow=True)
+    nxscope.ch_divider(2, 5, writenow=True)
 
     assert dev0.data.en is True
     assert dev1.data.en is True
@@ -280,43 +241,43 @@ def test_nxslib_channels_runtime():
         _ = q2.get(block=True, timeout=1)
 
     # stop stream
-    nxslib.stream_stop()
+    nxscope.stream_stop()
 
-    nxslib.stream_unsub(q0)
-    nxslib.stream_unsub(q1)
-    nxslib.stream_unsub(q2)
+    nxscope.stream_unsub(q0)
+    nxscope.stream_unsub(q1)
+    nxscope.stream_unsub(q2)
 
     # disconnect
-    nxslib.disconnect()
+    nxscope.disconnect()
 
 
 stream_started = threading.Event()
 stream_stop = threading.Event()
 
 
-def thread1(nxslib, inst):
+def thread1(nxscope, inst):
     # wait for stream started
     stream_started.wait()
 
     # get device handlers
-    dev0 = nxslib.dev_channel_get(0)
-    dev1 = nxslib.dev_channel_get(1)
-    dev2 = nxslib.dev_channel_get(2)
+    dev0 = nxscope.dev_channel_get(0)
+    dev1 = nxscope.dev_channel_get(1)
+    dev2 = nxscope.dev_channel_get(2)
 
     # make sure that channels enabled
-    nxslib.ch_enable(0)
-    nxslib.ch_enable(1)
-    nxslib.ch_enable(2)
-    nxslib.channels_write()
+    nxscope.ch_enable(0)
+    nxscope.ch_enable(1)
+    nxscope.ch_enable(2)
+    nxscope.channels_write()
 
     assert dev0.data.en is True
     assert dev1.data.en is True
     assert dev2.data.en is True
 
     # subscribe to streams
-    q0 = nxslib.stream_sub(0)
-    q1 = nxslib.stream_sub(1)
-    q2 = nxslib.stream_sub(2)
+    q0 = nxscope.stream_sub(0)
+    q1 = nxscope.stream_sub(1)
+    q2 = nxscope.stream_sub(2)
 
     # wait for stop request
     while not stream_stop.is_set():
@@ -324,36 +285,33 @@ def thread1(nxslib, inst):
         _ = q1.get(block=True, timeout=0.5)
         _ = q2.get(block=True, timeout=0.5)
 
-    nxslib.stream_unsub(q0)
-    nxslib.stream_unsub(q1)
-    nxslib.stream_unsub(q2)
+    nxscope.stream_unsub(q0)
+    nxscope.stream_unsub(q1)
+    nxscope.stream_unsub(q2)
 
 
-def test_nxslib_channels_thread():
+def test_nxscope_channels_thread():
     intf = DummyDev()
     parse = Parser()
-    comm = CommHandler(intf, parse)
-    nxslib = NxscopeHandler()
+    nxscope = NxscopeHandler(intf, parse)
 
-    nxslib.intf_connect(comm)
-
-    thr1 = threading.Thread(target=thread1, args=[nxslib, 1])
+    thr1 = threading.Thread(target=thread1, args=[nxscope, 1])
     thr1.start()
-    thr2 = threading.Thread(target=thread1, args=[nxslib, 2])
+    thr2 = threading.Thread(target=thread1, args=[nxscope, 2])
     thr2.start()
-    thr3 = threading.Thread(target=thread1, args=[nxslib, 3])
+    thr3 = threading.Thread(target=thread1, args=[nxscope, 3])
     thr3.start()
 
     # connect
-    nxslib.connect()
+    nxscope.connect()
 
     # force default state
-    nxslib.channels_default_cfg(writenow=True)
+    nxscope.channels_default_cfg(writenow=True)
 
     # get device handlers
-    dev0 = nxslib.dev_channel_get(0)
-    dev1 = nxslib.dev_channel_get(1)
-    dev2 = nxslib.dev_channel_get(2)
+    dev0 = nxscope.dev_channel_get(0)
+    dev1 = nxscope.dev_channel_get(1)
+    dev2 = nxscope.dev_channel_get(2)
 
     assert dev0.data.en is False
     assert dev1.data.en is False
@@ -363,27 +321,27 @@ def test_nxslib_channels_thread():
     assert dev2.data.div == 0
 
     # subscribe to streams
-    q0 = nxslib.stream_sub(0)
-    q1 = nxslib.stream_sub(1)
-    q2 = nxslib.stream_sub(2)
+    q0 = nxscope.stream_sub(0)
+    q1 = nxscope.stream_sub(1)
+    q2 = nxscope.stream_sub(2)
 
-    nxslib.channels_default_cfg(writenow=True)
+    nxscope.channels_default_cfg(writenow=True)
 
     # configure channels
-    nxslib.ch_enable(0)
-    nxslib.ch_enable(1)
-    nxslib.ch_enable(2)
-    nxslib.ch_divider(1, 1)
-    nxslib.ch_divider(2, 2)
-    nxslib.ch_divider(3, 3)
-    nxslib.channels_write()
+    nxscope.ch_enable(0)
+    nxscope.ch_enable(1)
+    nxscope.ch_enable(2)
+    nxscope.ch_divider(1, 1)
+    nxscope.ch_divider(2, 2)
+    nxscope.ch_divider(3, 3)
+    nxscope.channels_write()
 
     assert dev0.data.en is True
     assert dev1.data.en is True
     assert dev2.data.en is True
 
     # start stream without channels configured
-    nxslib.stream_start()
+    nxscope.stream_start()
     stream_started.set()
 
     # get more data
@@ -396,11 +354,11 @@ def test_nxslib_channels_thread():
     stream_stop.set()
 
     # stop stream
-    nxslib.stream_stop()
+    nxscope.stream_stop()
 
-    nxslib.stream_unsub(q0)
-    nxslib.stream_unsub(q1)
-    nxslib.stream_unsub(q2)
+    nxscope.stream_unsub(q0)
+    nxscope.stream_unsub(q1)
+    nxscope.stream_unsub(q2)
 
     # wait for threads
     thr1.join()
@@ -408,4 +366,4 @@ def test_nxslib_channels_thread():
     thr3.join()
 
     # disconnect
-    nxslib.disconnect()
+    nxscope.disconnect()
