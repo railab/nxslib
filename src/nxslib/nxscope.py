@@ -6,13 +6,14 @@ from dataclasses import dataclass
 from threading import Lock
 from typing import TYPE_CHECKING, Any
 
+from nxslib.comm import CommHandler
 from nxslib.logger import logger
 from nxslib.thread import ThreadCommon
 
 if TYPE_CHECKING:
-    from nxslib.comm import CommHandler
     from nxslib.dev import Device, DeviceChannel
-    from nxslib.proto.iparse import DParseStream
+    from nxslib.intf.iintf import ICommInterface
+    from nxslib.proto.iparse import DParseStream, ICommParse
 
 
 ###############################################################################
@@ -44,9 +45,10 @@ class DNxscopeStream:
 class NxscopeHandler:
     """A class used to manage NxScope device."""
 
-    def __init__(self) -> None:
+    def __init__(self, intf: "ICommInterface", parse: "ICommParse") -> None:
         """Initialize the Nxslib handler."""
-        self._comm: "CommHandler"
+        self._connected: bool = False
+        self._comm = CommHandler(intf, parse)
 
         self._thrd = ThreadCommon(self._stream_thread, name="stream")
 
@@ -54,7 +56,6 @@ class NxscopeHandler:
         self._queue_lock: Lock = Lock()
 
         self._stream_started: bool = False
-        self._connected: bool = False
 
         self._ovf_cntr: int = 0
 
@@ -64,8 +65,6 @@ class NxscopeHandler:
 
     def _stream_start(self) -> bool:
         """Start stream request."""
-        assert self._comm
-
         self._reset_stats()
 
         ret = self._comm.stream_start()
@@ -76,8 +75,6 @@ class NxscopeHandler:
 
     def _stream_stop(self) -> bool:
         """Stop stream request."""
-        assert self._comm
-
         ret = self._comm.stream_stop()
         if ret is None:  # pragma: no cover
             return False
@@ -86,12 +83,10 @@ class NxscopeHandler:
 
     def _nxslib_stream(self) -> "DParseStream | None":
         """Get nxslib stream data."""
-        assert self._comm
         return self._comm.stream_data()
 
     def _stream_thread(self) -> None:
         """Stream thread."""
-        assert self._comm
         assert self.dev
 
         chmax = self.dev.data.chmax
@@ -136,23 +131,10 @@ class NxscopeHandler:
     @property
     def dev(self) -> "Device | None":
         """Get device info."""
-        assert self._comm
         return self._comm.dev
-
-    @property
-    def intf_is_connected(self) -> bool:
-        """Get connection status."""
-        try:
-            if self._comm is not None:
-                return True
-            return False  # pragma: no cover
-        except AttributeError:
-            return False
 
     def connect(self) -> "Device | None":
         """Connect with a NxScope device."""
-        assert self._comm
-
         if self._connected is True:
             logger.info("WARNING: ALREADY CONNECTED!")
             return self._comm.dev
@@ -170,20 +152,11 @@ class NxscopeHandler:
     def disconnect(self) -> None:
         """Disconnect from a NxScope device."""
         if self._connected is True:
-            assert self._comm
             # stop stream
             self.stream_stop()
             # disconnect
             self._comm.disconnect()
             self._connected = False
-
-    def intf_connect(self, comm: "CommHandler") -> None:
-        """Connect a NxScope communication handler.
-
-        :param comm: communication handler
-        """
-        assert comm
-        self._comm = comm
 
     def dev_channel_get(self, chid: int) -> "DeviceChannel | None":
         """Get a channel info.
@@ -199,8 +172,6 @@ class NxscopeHandler:
         Before starting the stream, the bufferd channel configuration
         is applied to the device.
         """
-        assert self._comm
-
         if not self._stream_started:
             # initialize stream
             self.channels_write()
@@ -215,8 +186,6 @@ class NxscopeHandler:
 
     def stream_stop(self) -> None:
         """Stop a data stream."""
-        assert self._comm
-
         if self._stream_started is True:
             # stop request for nxslib
             self._stream_stop()
@@ -256,7 +225,6 @@ class NxscopeHandler:
         or can be forced to write with writenow flag.
         :param writenow: write channels configuration now
         """
-        assert self._comm
         self._comm.channels_default_cfg()
 
         if writenow:
@@ -275,7 +243,6 @@ class NxscopeHandler:
         :param chans: single channel ID or list with channels IDs
         :param writenow: write channels configuration now
         """
-        assert self._comm
         self._comm.ch_enable(chans)
 
         if writenow:
@@ -294,7 +261,6 @@ class NxscopeHandler:
         :param chans: single channel ID or list with channels IDs
         :param writenow: write channels configuration now
         """
-        assert self._comm
         self._comm.ch_disable(chans)
 
         if writenow:
@@ -314,7 +280,6 @@ class NxscopeHandler:
         :param div: divider value to be set
         :param writenow: write channels configuration now
         """
-        assert self._comm
         self._comm.ch_divider(chans, div)
 
         if writenow:
@@ -323,5 +288,4 @@ class NxscopeHandler:
 
     def channels_write(self) -> None:
         """Write channels configuration."""
-        assert self._comm
         self._comm.channels_write()

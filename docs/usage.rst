@@ -30,23 +30,13 @@ Quick start
       intf = SerialDevice(serial_path, serial_baud)
 
 
-3. Create a NxScope instance and connect with the communication handler:
+3. Create a NxScope instance and connect:
 
    .. code-block:: python
 
-      from nxslib.comm import CommHandler
       from nxslib.nxscope import NxscopeHandler
 
-      nxscope = NxscopeHandler()
-
-      comm = CommHandler(intf, parse)
-      nxscope.intf_connect(comm)
-
-
-4. Now, we can connect to the device:
-
-   .. code-block:: python
-
+      nxscope = NxscopeHandler(intf, parse)
       nxscope.connect()
       print(nxscope.dev)
 
