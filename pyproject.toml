@@ -7,13 +7,29 @@ name = "nxslib"
 version = "0.1.0"
 authors = [{name = "raiden00", email = "raiden00@railab.me"}]
 description = "NxScope client library"
-license = {file = "LICENSE"}
+license = {text = "Apache-2.0"}
+readme = "README.md"
 requires-python = ">=3.10"
-classifiers = ["License :: OSI Approved :: Apache Software License"]
 dependencies = [
          "pyserial>=3.5",
          "crcmod>=1.7",
 ]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License"
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Software Development :: Embedded Systems",
+  "Operating System :: OS Independent",
+]
+keywords = [
+  "nuttx"
+]
+
+[project.urls]
+Changelog = "https://github.com/railab/nxslib/blob/master/CHANGES.md"
+Homepage = "https://github.com/railab/nxslib"
 
 [tool.black]
 line-length = 79
