@@ -1,7 +1,6 @@
 """Module containing the NxScope handler."""
 
 import queue
-import time
 from dataclasses import dataclass
 from threading import Lock
 from typing import TYPE_CHECKING, Any
@@ -13,7 +12,7 @@ from nxslib.thread import ThreadCommon
 if TYPE_CHECKING:
     from nxslib.dev import Device, DeviceChannel
     from nxslib.intf.iintf import ICommInterface
-    from nxslib.proto.iparse import DParseStream, ICommParse
+    from nxslib.proto.iparse import ICommParse
 
 
 ###############################################################################
@@ -81,49 +80,39 @@ class NxscopeHandler:
 
         return ret.state
 
-    def _nxslib_stream(self) -> "DParseStream | None":
-        """Get nxslib stream data."""
-        return self._comm.stream_data()
-
     def _stream_thread(self) -> None:
         """Stream thread."""
         assert self.dev
-
         chmax = self.dev.data.chmax
 
-        # get stream data
-        sdata = self._nxslib_stream()
-        if sdata is None:
-            # wait some time to free resources
-            # this allow us handle properly ACK frames that are
-            # captured by stream logic
-            time.sleep(0.01)
-        else:
-            stream = sdata.samples
-            flags = sdata.flags
+        samples: list[list[DNxscopeStream]]
+        samples = [[] for _ in range(chmax)]
 
-            if self._comm.flags_is_overflow(flags) is True:  # pragma: no cover
+        # get stream data
+        sdata = self._comm.stream_data()
+        if sdata:
+            if (
+                self._comm.flags_is_overflow(sdata.flags) is True
+            ):  # pragma: no cover
                 logger.info("stream flags: OVERFLOW!")
                 self._ovf_cntr += 1
 
-            samples: list[list[DNxscopeStream]]
-            samples = [[] for _ in range(chmax)]
-
-            for data in stream:
-                chan = data.chan
-                val = data.data
-                meta = data.meta
+            for data in sdata.samples:
                 # channel enabled
-                if self._comm.ch_is_enabled(chan) is True:  # pragma: no cover
-                    samples[chan].append(DNxscopeStream(val, meta))
+                if (
+                    self._comm.ch_is_enabled(data.chan) is True
+                ):  # pragma: no cover
+                    samples[data.chan].append(
+                        DNxscopeStream(data.data, data.meta)
+                    )
 
             with self._queue_lock:
                 # send all samples at once
-                for chan in range(chmax):
-                    if len(samples[chan]) > 0:
+                for data.chan in range(chmax):
+                    if len(samples[data.chan]) > 0:
                         # send for all subscribers
-                        for que in self._sub_q[chan]:
-                            que.put(samples[chan])
+                        for que in self._sub_q[data.chan]:
+                            que.put(samples[data.chan])
 
     def _reset_stats(self) -> None:
         self._ovf_cntr = 0
