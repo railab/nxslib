@@ -13,6 +13,7 @@ requires-python = ">=3.10"
 dependencies = [
          "pyserial>=3.5",
          "crcmod>=1.7",
+         "pylink-square>=1.2",
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
