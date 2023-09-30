@@ -25,6 +25,9 @@ class SerialDevice(ICommInterface):
 
         :param port: path to the serial port device
         :param baud: baud rate
+        :param bytesize: number of data bits
+        :param parity: parity checking
+        :param stopbits: number of stop bits
         """
         try:
             self._ser = serial.Serial(
@@ -50,11 +53,11 @@ class SerialDevice(ICommInterface):
 
     def start(self) -> None:
         """Start the interface."""
-        logger.debug("start dummy interface")
+        logger.debug("start serial interface")
 
     def stop(self) -> None:
         """Stop the interface."""
-        logger.debug("Stop dummy interface")
+        logger.debug("Stop serial interface")
 
     def drop_all(self) -> None:
         """Drop all frames."""
