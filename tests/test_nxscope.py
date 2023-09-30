@@ -240,6 +240,20 @@ def test_nxscope_channels_runtime():
         _ = q1.get(block=True, timeout=1)
         _ = q2.get(block=True, timeout=1)
 
+    # configuration not written
+    nxscope.ch_disable_all()
+
+    assert dev0.data.en is True
+    assert dev1.data.en is True
+    assert dev2.data.en is True
+
+    # configuration written
+    nxscope.ch_disable_all(True)
+
+    assert dev0.data.en is False
+    assert dev1.data.en is False
+    assert dev2.data.en is False
+
     # stop stream
     nxscope.stream_stop()
 

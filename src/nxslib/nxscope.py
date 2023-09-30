@@ -143,6 +143,8 @@ class NxscopeHandler:
         if self._connected is True:
             # stop stream
             self.stream_stop()
+            # disable all channels now
+            self.ch_disable_all(True)
             # disconnect
             self._comm.disconnect()
             self._connected = False
@@ -251,6 +253,21 @@ class NxscopeHandler:
         :param writenow: write channels configuration now
         """
         self._comm.ch_disable(chans)
+
+        if writenow:
+            # write channels configuration
+            self.channels_write()
+
+    def ch_disable_all(self, writenow: bool = False) -> None:
+        """Disable all channels.
+
+        The effects of this method are buffered and will
+        be applied to the device just before the stream starts
+        or can be forced to write with writenow flag.
+
+        :param writenow: write channels configuration now
+        """
+        self._comm.ch_disable_all()
 
         if writenow:
             # write channels configuration
