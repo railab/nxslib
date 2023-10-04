@@ -61,8 +61,11 @@ class SerialDevice(ICommInterface):
 
     def drop_all(self) -> None:
         """Drop all frames."""
-        for _ in range(10):
-            self._read()
+        cntr = 4
+        while cntr > 0:
+            ret = self._read()
+            if not ret:  # pragma: no cover
+                cntr -= 1
 
     def _read(self) -> bytes:
         """Interface specific read method."""
