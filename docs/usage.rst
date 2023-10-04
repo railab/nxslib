@@ -29,6 +29,14 @@ Quick start
       serial_buad = 100000
       intf = SerialDevice(serial_path, serial_baud)
 
+   or device that support NxScope over Segger RTT interface:
+
+   .. code-block:: python
+
+      target_device = "STM32G431CB"
+      buffer_index = 1
+      upsize = 2048
+      intf = RTTDevice(target_device, buffer_index, upsize)
 
 3. Create a NxScope instance and connect:
 
@@ -156,7 +164,7 @@ Just use `DummyDev` class parameters: `chmax`, `flags` and `channels`.
 
 
 Serial port interface
-""""""""""""""""""""""
+"""""""""""""""""""""
 
 You can use `socat` to connect to a simulated NuttX target:
 
