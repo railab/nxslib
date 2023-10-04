@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = "nxslib"
-version = "0.9.0"
+version = "0.9.1"
 authors = [{name = "raiden00", email = "raiden00@railab.me"}]
 description = "NxScope client library"
 license = {text = "Apache-2.0"}
