@@ -11,6 +11,7 @@ Compatible with Python 3.10+.
 * built-in simulated NxScope device that allows application development without 
 connecting a real NuttX device
 * support for the NxScope serial protocol
+* support for Segger RTT interface based on [pylink](https://github.com/square/pylink)
 * user-specific stream data decoding (user-defined types)
 * support for custom protocols
 
