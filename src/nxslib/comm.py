@@ -76,7 +76,9 @@ class CommHandler:
 
     def _drop_all(self) -> None:
         """Drop all frames."""
+        # drop frames from interface
         self._intf.drop_all()
+        # drop cached frames
         self._drop_all_frames()
 
     def _recv_thread(self) -> None:
@@ -272,14 +274,14 @@ class CommHandler:
             # start interface
             self._intf.start()
 
-            # start recv thread
-            self._thrd.thread_start()
-
             # send stop request
             self.stream_stop()
 
             # drop all pending data
             self._drop_all()
+
+            # start recv thread
+            self._thrd.thread_start()
 
             # get info frame
             timeout = 5
