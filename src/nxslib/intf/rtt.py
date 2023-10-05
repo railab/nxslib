@@ -53,7 +53,26 @@ class RTTDevice(ICommInterface):  # pragma: no cover
         self.upsize = upsize
 
         # connect to JLink
-        while True:
+        if not self._jlink_connect(target_device, jlinkinterface, block_address):
+            raise IOError("Failed to connect to JLink device")
+
+        # wait for RTT (revisit: do we need that ?)
+        if not self._jlink_rtt_wait():
+            raise IOError("Failed to get RTT interface")
+
+        super().__init__()
+
+    def __del__(self) -> None:
+        """Make sure that serial port is closed."""
+
+    def _jlink_connect(
+        self,
+        target_device: str,
+        jlinkinterface: int,
+        block_address: int | None,
+    ) -> bool:
+        cntr = 3
+        while cntr > 0:
             try:
                 print("connecting to", target_device, "...")
                 self._jlink = pylink.JLink()
@@ -62,12 +81,16 @@ class RTTDevice(ICommInterface):  # pragma: no cover
                 self._jlink.connect(target_device)
                 print("connected, starting RTT...")
                 self._jlink.rtt_start(block_address)
-                break
+                return True
             except pylink.errors.JLinkException:
                 time.sleep(0.1)
+                cntr -= 1
 
-        # wait for RTT (revisit: do we need that ?)
-        while True:
+        return False
+
+    def _jlink_rtt_wait(self) -> bool:
+        cntr = 3
+        while cntr > 0:
             try:
                 num_up = self._jlink.rtt_get_num_up_buffers()
                 num_down = self._jlink.rtt_get_num_down_buffers()
@@ -75,14 +98,12 @@ class RTTDevice(ICommInterface):  # pragma: no cover
                     "RTT started, %d up bufs, %d down bufs."
                     % (num_up, num_down)
                 )
-                break
+                return True
             except pylink.errors.JLinkRTTException:
                 time.sleep(0.1)
+                cntr -= 1
 
-        super().__init__()
-
-    def __del__(self) -> None:
-        """Make sure that serial port is closed."""
+        return False
 
     def start(self) -> None:
         """Start the interface."""
