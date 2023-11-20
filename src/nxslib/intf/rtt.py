@@ -53,7 +53,9 @@ class RTTDevice(ICommInterface):  # pragma: no cover
         self.upsize = upsize
 
         # connect to JLink
-        if not self._jlink_connect(target_device, jlinkinterface, block_address):
+        if not self._jlink_connect(
+            target_device, jlinkinterface, block_address
+        ):
             raise IOError("Failed to connect to JLink device")
 
         # wait for RTT (revisit: do we need that ?)
@@ -100,7 +102,7 @@ class RTTDevice(ICommInterface):  # pragma: no cover
                 )
                 return True
             except pylink.errors.JLinkRTTException:
-                time.sleep(0.1)
+                time.sleep(0.5)
                 cntr -= 1
 
         return False
