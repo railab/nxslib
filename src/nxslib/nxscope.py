@@ -1,12 +1,15 @@
 """Module containing the NxScope handler."""
 
 import queue
+from collections import deque
 from dataclasses import dataclass
 from threading import Lock
+from time import time
 from typing import TYPE_CHECKING, Any
 
 from nxslib.comm import CommHandler
 from nxslib.logger import logger
+from nxslib.proto.iparse import dsfmt_get
 from nxslib.thread import ThreadCommon
 
 if TYPE_CHECKING:
@@ -37,6 +40,106 @@ class DNxscopeStream:
 
 
 ###############################################################################
+# Data: DChannelState
+###############################################################################
+
+
+@dataclass(frozen=True)
+class DChannelState:
+    """Channels runtime state snapshot."""
+
+    enabled_channels: tuple[int, ...]
+    dividers: tuple[int, ...]
+
+
+###############################################################################
+# Data: DDeviceCapabilities
+###############################################################################
+
+
+@dataclass(frozen=True)
+class DDeviceCapabilities:
+    """Device capabilities snapshot."""
+
+    chmax: int
+    flags: int
+    rxpadding: int
+    div_supported: bool
+    ack_supported: bool
+
+
+###############################################################################
+# Data: DStreamStats
+###############################################################################
+
+
+@dataclass(frozen=True)
+class DStreamStats:
+    """Stream runtime stats snapshot."""
+
+    connected: bool
+    stream_started: bool
+    overflow_count: int
+    bitrate: float
+
+
+###############################################################################
+# Class: _BitrateTracker
+###############################################################################
+
+
+class _BitrateTracker:
+    """Helper for bitrate calculation with moving average."""
+
+    def __init__(self, window_seconds: float = 5.0) -> None:
+        """Initialize bitrate tracker.
+
+        :param window_seconds: Time window for moving average
+        """
+        self._bytes_received: int = 0
+        self._last_timestamp: float = 0.0
+        self._samples: deque[tuple[float, int]] = deque()
+        self._window_seconds: float = window_seconds
+        self._lock = Lock()
+
+    def update(self, bytes_count: int) -> None:
+        """Update tracker with new byte count.
+
+        :param bytes_count: Number of bytes received
+        """
+        with self._lock:
+            now = time()
+            self._bytes_received += bytes_count
+            self._samples.append((now, bytes_count))
+
+            # Remove samples older than window
+            cutoff = now - self._window_seconds
+            while self._samples and self._samples[0][0] < cutoff:
+                self._samples.popleft()
+
+            self._last_timestamp = now
+
+    def get_bitrate(self) -> float:
+        """Calculate current bitrate.
+
+        :return: Bytes per second over the window period
+        """
+        with self._lock:
+            if not self._samples:
+                return 0.0
+
+            now = time()
+            oldest_time = self._samples[0][0]
+            time_span = now - oldest_time
+
+            if time_span < 0.1:  # Less than 100ms of data
+                return 0.0
+
+            total_bytes = sum(count for _, count in self._samples)
+            return total_bytes / time_span
+
+
+###############################################################################
 # Class: NxscopeHandler
 ###############################################################################
 
@@ -44,8 +147,19 @@ class DNxscopeStream:
 class NxscopeHandler:
     """A class used to manage NxScope device."""
 
-    def __init__(self, intf: "ICommInterface", parse: "ICommParse") -> None:
-        """Initialize the Nxslib handler."""
+    def __init__(
+        self,
+        intf: "ICommInterface",
+        parse: "ICommParse",
+        enable_bitrate_tracking: bool = False,
+    ) -> None:
+        """Initialize the Nxslib handler.
+
+        :param intf: Communication interface
+        :param parse: Protocol parser
+        :param enable_bitrate_tracking: Enable bitrate tracking
+            (default: False)
+        """
         self._connected: bool = False
         self._comm = CommHandler(intf, parse)
 
@@ -57,6 +171,10 @@ class NxscopeHandler:
         self._stream_started: bool = False
 
         self._ovf_cntr: int = 0
+        self._stats_lock: Lock = Lock()
+        self._bitrate_tracker: _BitrateTracker | None = (
+            _BitrateTracker() if enable_bitrate_tracking else None
+        )
 
     def __del__(self) -> None:
         """Make sure to disconnect from dev."""
@@ -95,9 +213,22 @@ class NxscopeHandler:
                 self._comm.flags_is_overflow(sdata.flags) is True
             ):  # pragma: no cover
                 logger.info("stream flags: OVERFLOW!")
-                self._ovf_cntr += 1
+                with self._stats_lock:
+                    self._ovf_cntr += 1
 
+            # Track bytes for all samples
             for data in sdata.samples:
+                # Track bytes for bitrate calculation for all samples
+                # Get channel info to get correct type
+                ch = self.dev_channel_get(data.chan)
+                if ch:
+                    dsfmt = dsfmt_get(ch.data.dtype)
+                    data_bytes = dsfmt.slen * ch.data.vdim
+                    meta_bytes = ch.data.mlen
+                    total_bytes = data_bytes + meta_bytes
+                    if self._bitrate_tracker is not None:
+                        self._bitrate_tracker.update(total_bytes)
+
                 # channel enabled
                 if (
                     self._comm.ch_is_enabled(data.chan) is True
@@ -115,12 +246,94 @@ class NxscopeHandler:
                             que.put(samples[data.chan])
 
     def _reset_stats(self) -> None:
-        self._ovf_cntr = 0
+        with self._stats_lock:
+            self._ovf_cntr = 0
+        if self._bitrate_tracker is not None:
+            self._bitrate_tracker = _BitrateTracker()
 
     @property
     def dev(self) -> "Device | None":
         """Get device info."""
         return self._comm.dev
+
+    @property
+    def connected(self) -> bool:
+        """Check if device is connected."""
+        return self._connected
+
+    @property
+    def stream_started(self) -> bool:
+        """Check if stream is started."""
+        return self._stream_started
+
+    @property
+    def overflow_count(self) -> int:
+        """Get overflow counter."""
+        with self._stats_lock:
+            return self._ovf_cntr
+
+    def get_bitrate(self) -> float:
+        """Calculate current bitrate with moving average.
+
+        :return: Bytes per second over the window period, or 0.0 if
+        tracking disabled
+        """
+        if self._bitrate_tracker is None:
+            return 0.0
+        return self._bitrate_tracker.get_bitrate()
+
+    def get_enabled_channels(self, applied: bool = True) -> tuple[int, ...]:
+        """Get enabled channels state.
+
+        :param applied: get currently-applied values when True, otherwise get
+            buffered values that will be applied on next channels_write
+        """
+        return self._comm.get_enabled_channels(applied=applied)
+
+    def get_channel_divider(self, chid: int, applied: bool = True) -> int:
+        """Get divider for a channel.
+
+        :param chid: channel ID
+        :param applied: get currently-applied value when True, otherwise get
+            buffered value that will be applied on next channels_write
+        """
+        return self._comm.ch_div_get(chid, applied=applied)
+
+    def get_channel_dividers(self, applied: bool = True) -> tuple[int, ...]:
+        """Get divider values for all channels.
+
+        :param applied: get currently-applied values when True, otherwise get
+            buffered values that will be applied on next channels_write
+        """
+        return self._comm.get_channel_dividers(applied=applied)
+
+    def get_channels_state(self, applied: bool = True) -> DChannelState:
+        """Get channels state snapshot."""
+        return DChannelState(
+            enabled_channels=self.get_enabled_channels(applied=applied),
+            dividers=self.get_channel_dividers(applied=applied),
+        )
+
+    def get_device_capabilities(self) -> DDeviceCapabilities:
+        """Get device capabilities snapshot."""
+        assert self.dev
+        data = self.dev.data
+        return DDeviceCapabilities(
+            chmax=data.chmax,
+            flags=data.flags,
+            rxpadding=data.rxpadding,
+            div_supported=data.div_supported,
+            ack_supported=data.ack_supported,
+        )
+
+    def get_stream_stats(self) -> DStreamStats:
+        """Get stream stats snapshot."""
+        return DStreamStats(
+            connected=self.connected,
+            stream_started=self.stream_started,
+            overflow_count=self.overflow_count,
+            bitrate=self.get_bitrate(),
+        )
 
     def connect(self) -> "Device | None":
         """Connect with a NxScope device."""

@@ -562,14 +562,45 @@ class CommHandler:
             assert self._channels
             return self._channels.en_now[chan]
 
-    def ch_div_get(self, chan: int) -> int:
+    def ch_div_get(self, chan: int, applied: bool = True) -> int:
         """Get channel divider.
 
         :param chid: the channel ID
+        :param applied: get currently-applied value when True, otherwise get
+            buffered value that will be applied on next channels_write
         """
         with self._channels_lock:
             assert self._channels
-            return self._channels.div_now[chan]
+            if applied:
+                return self._channels.div_now[chan]
+            return self._channels.div_new[chan]
+
+    def get_enabled_channels(self, applied: bool = True) -> tuple[int, ...]:
+        """Get list of currently enabled channel IDs.
+
+        :param applied: get currently-applied values when True, otherwise get
+            buffered values that will be applied on next channels_write
+        :return: Tuple of enabled channel IDs
+        """
+        with self._channels_lock:
+            assert self._channels
+            channels = (
+                self._channels.en_now if applied else self._channels.en_new
+            )
+            return tuple(i for i, enabled in enumerate(channels) if enabled)
+
+    def get_channel_dividers(self, applied: bool = True) -> tuple[int, ...]:
+        """Get channel divider values for all channels.
+
+        :param applied: get currently-applied values when True, otherwise get
+            buffered values that will be applied on next channels_write
+        :return: Tuple with divider value for each channel index
+        """
+        with self._channels_lock:
+            assert self._channels
+            if applied:
+                return tuple(self._channels.div_now)
+            return tuple(self._channels.div_new)
 
     def channels_default_cfg(self) -> None:
         """Set default channels configuration."""
