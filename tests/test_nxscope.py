@@ -381,3 +381,215 @@ def test_nxscope_channels_thread():
 
     # disconnect
     nxscope.disconnect()
+
+
+def test_nxscope_properties():
+    """Test new properties added to NxscopeHandler."""
+    intf = DummyDev()
+    parse = Parser()
+    nxscope = NxscopeHandler(intf, parse)
+
+    # Test connected property
+    assert nxscope.connected is False
+    nxscope.connect()
+    assert nxscope.connected is True
+    nxscope.disconnect()
+    assert nxscope.connected is False
+
+    # Reconnect for further tests
+    nxscope.connect()
+
+    # Test stream_started property
+    assert nxscope.stream_started is False
+    nxscope.stream_start()
+    assert nxscope.stream_started is True
+    nxscope.stream_stop()
+    assert nxscope.stream_started is False
+
+    # Test overflow_count property
+    overflow_count = nxscope.overflow_count
+    assert isinstance(overflow_count, int)
+    assert overflow_count >= 0
+
+    # disconnect
+    nxscope.disconnect()
+
+
+def test_nxscope_channels_state_interfaces():
+    """Test channels state access interfaces."""
+    intf = DummyDev()
+    parse = Parser()
+    nxscope = NxscopeHandler(intf, parse)
+
+    nxscope.connect()
+    nxscope.channels_default_cfg(writenow=True)
+
+    # applied and buffered states are equal after writenow
+    assert nxscope.get_enabled_channels() == ()
+    assert nxscope.get_channel_divider(0) == 0
+    assert nxscope.get_channel_dividers()[0] == 0
+
+    applied = nxscope.get_channels_state(applied=True)
+    buffered = nxscope.get_channels_state(applied=False)
+    assert applied == buffered
+
+    # configure buffered state without writing
+    nxscope.ch_enable(0)
+    nxscope.ch_divider(0, 7)
+
+    applied2 = nxscope.get_channels_state(applied=True)
+    buffered2 = nxscope.get_channels_state(applied=False)
+    assert 0 not in applied2.enabled_channels
+    assert 0 in buffered2.enabled_channels
+    assert applied2.dividers[0] == 0
+    assert buffered2.dividers[0] == 7
+
+    nxscope.channels_write()
+
+    # now applied should match buffered configuration
+    applied3 = nxscope.get_channels_state(applied=True)
+    assert 0 in applied3.enabled_channels
+    assert applied3.dividers[0] == 7
+
+    nxscope.disconnect()
+
+
+def test_nxscope_capabilities_and_stats_interfaces():
+    """Test capabilities and stream stats interfaces."""
+    intf = DummyDev()
+    parse = Parser()
+    nxscope = NxscopeHandler(intf, parse, enable_bitrate_tracking=True)
+
+    nxscope.connect()
+
+    caps = nxscope.get_device_capabilities()
+    assert caps.chmax > 0
+    assert isinstance(caps.div_supported, bool)
+    assert isinstance(caps.ack_supported, bool)
+
+    stats = nxscope.get_stream_stats()
+    assert stats.connected is True
+    assert stats.stream_started is False
+    assert stats.overflow_count == 0
+    assert stats.bitrate == 0.0
+
+    nxscope.disconnect()
+
+
+def test_nxscope_bitrate():
+    """Test get_bitrate method."""
+    import time
+
+    intf = DummyDev()
+    parse = Parser()
+    nxscope = NxscopeHandler(intf, parse, enable_bitrate_tracking=True)
+
+    # connect
+    nxscope.connect()
+
+    # Before stream starts, bitrate should be 0
+    bitrate = nxscope.get_bitrate()
+    assert bitrate == 0.0
+
+    # Enable a channel and start stream
+    nxscope.ch_enable([0])
+    q = nxscope.stream_sub(0)
+    nxscope.stream_start()
+
+    # Wait for some data
+    for _ in range(10):
+        q.get(block=True, timeout=1)
+
+    # Small delay to ensure bitrate tracker has data
+    time.sleep(0.2)
+
+    # Now bitrate should be > 0
+    bitrate = nxscope.get_bitrate()
+    assert bitrate > 0
+
+    # stop stream
+    nxscope.stream_stop()
+    nxscope.stream_unsub(q)
+
+    # disconnect
+    nxscope.disconnect()
+
+
+def test_bitrate_tracker():
+    """Test _BitrateTracker class."""
+    import time
+
+    from nxslib.nxscope import _BitrateTracker
+
+    tracker = _BitrateTracker(window_seconds=1.0)
+
+    # Initially no data
+    assert tracker.get_bitrate() == 0.0
+
+    # Add some data
+    tracker.update(1000)
+    time.sleep(0.1)
+    tracker.update(1000)
+
+    # Should have a bitrate now
+    bitrate = tracker.get_bitrate()
+    assert bitrate > 0
+
+    # Test with very short time span (< 100ms)
+    tracker2 = _BitrateTracker(window_seconds=1.0)
+    tracker2.update(1000)
+    tracker2.update(1000)  # Immediate second update
+    bitrate = tracker2.get_bitrate()
+    assert bitrate == 0.0  # Too short time span
+
+    # Test window cleanup
+    tracker3 = _BitrateTracker(window_seconds=0.5)
+    tracker3.update(1000)
+    time.sleep(0.2)
+    tracker3.update(1000)
+
+    # Should have bitrate from two samples
+    bitrate = tracker3.get_bitrate()
+    assert bitrate > 0
+
+    # After window expires, old sample is cleaned on next update
+    time.sleep(0.4)  # Total 0.6s from first sample
+    tracker3.update(1000)  # This triggers cleanup
+
+    # Bitrate calculation still works after cleanup
+    bitrate = tracker3.get_bitrate()
+    assert isinstance(bitrate, float)
+
+
+def test_nxscope_bitrate_disabled():
+    """Test that bitrate tracking is disabled by default."""
+    intf = DummyDev()
+    parse = Parser()
+    nxscope = NxscopeHandler(intf, parse)  # No enable_bitrate_tracking
+
+    # connect
+    nxscope.connect()
+
+    # Bitrate should always be 0 when tracking is disabled
+    bitrate = nxscope.get_bitrate()
+    assert bitrate == 0.0
+
+    # Even with streaming
+    nxscope.ch_enable([0])
+    q = nxscope.stream_sub(0)
+    nxscope.stream_start()
+
+    # Wait for some data
+    for _ in range(10):
+        q.get(block=True, timeout=1)
+
+    # Bitrate should still be 0 (tracking disabled)
+    bitrate = nxscope.get_bitrate()
+    assert bitrate == 0.0
+
+    # stop stream
+    nxscope.stream_stop()
+    nxscope.stream_unsub(q)
+
+    # disconnect
+    nxscope.disconnect()

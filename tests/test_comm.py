@@ -367,3 +367,46 @@ def test_nxslib_noack(comm):
 
     # disconnect
     comm.disconnect()
+
+
+def test_comm_get_enabled_channels():
+    """Test get_enabled_channels method."""
+    i = DummyDev()
+    p = Parser()
+    comm = CommHandler(i, p)
+
+    # connect
+    comm.connect()
+
+    # default configuration - no channels enabled
+    comm.channels_default_cfg()
+    comm.channels_write()
+
+    enabled = comm.get_enabled_channels()
+    assert enabled == ()
+
+    # configure buffered-only state (not written yet)
+    comm.ch_enable(1)
+    comm.ch_divider(1, 7)
+    assert comm.get_enabled_channels(applied=True) == ()
+    assert 1 in comm.get_enabled_channels(applied=False)
+    assert comm.ch_div_get(1, applied=True) == 0
+    assert comm.ch_div_get(1, applied=False) == 7
+
+    # enable some channels
+    comm.ch_enable(0)
+    comm.ch_enable(2)
+    comm.ch_enable(4)
+    comm.channels_write()
+
+    enabled = comm.get_enabled_channels()
+    assert 0 in enabled
+    assert 1 in enabled
+    assert 2 in enabled
+    assert 4 in enabled
+    assert 3 not in enabled
+    dividers = comm.get_channel_dividers()
+    assert dividers[1] == 7
+
+    # disconnect
+    comm.disconnect()
