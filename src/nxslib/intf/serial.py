@@ -71,7 +71,11 @@ class SerialDevice(ICommInterface):
         """Interface specific read method."""
         assert self._ser
         try:
-            return self._ser.read(self._ser.in_waiting)  # type: ignore
+            pending = self._ser.in_waiting
+            # Avoid busy loop when no data is pending: read(0) returns
+            # immediately and can spin a CPU core in the recv thread.
+            size = pending if pending > 0 else 1
+            return self._ser.read(size)  # type: ignore
         except serial.SerialException as exc:
             logger.debug("SerialException ignored: %s", str(exc))
             return b""
