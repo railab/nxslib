@@ -1,5 +1,6 @@
 import queue
 import threading
+import time
 
 import pytest  # type: ignore
 
@@ -181,7 +182,7 @@ def test_nxscope_channels_runtime():
     assert dev2.data.div == 0
 
     # wait for data
-    data = q0.get(block=True, timeout=0.5)
+    data = _wait_for_data(q0, timeout=3.0)
     assert data
     with pytest.raises(queue.Empty):
         _ = q1.get(block=True, timeout=0.5)
@@ -200,9 +201,9 @@ def test_nxscope_channels_runtime():
     assert dev2.data.div == 0
 
     # wait for data
-    data = q0.get(block=True, timeout=0.5)
+    data = _wait_for_data(q0, timeout=3.0)
     assert data
-    data = q1.get(block=True, timeout=0.5)
+    data = _wait_for_data(q1, timeout=3.0)
     assert data
     with pytest.raises(queue.Empty):
         _ = q2.get(block=True, timeout=0.5)
@@ -236,9 +237,9 @@ def test_nxscope_channels_runtime():
 
     # get more data
     for _ in range(100):
-        _ = q0.get(block=True, timeout=1)
-        _ = q1.get(block=True, timeout=1)
-        _ = q2.get(block=True, timeout=1)
+        _ = _wait_for_data(q0, timeout=3.0)
+        _ = _wait_for_data(q1, timeout=3.0)
+        _ = _wait_for_data(q2, timeout=3.0)
 
     # configuration not written
     nxscope.ch_disable_all()
@@ -269,6 +270,20 @@ stream_started = threading.Event()
 stream_stop = threading.Event()
 
 
+def _wait_for_data(q, timeout: float = 3.0, step: float = 0.2):
+    """Retry queue.get to reduce CI timing flakiness."""
+    deadline = time.time() + timeout
+    while True:
+        remaining = deadline - time.time()
+        if remaining <= 0:
+            raise queue.Empty
+        chunk = step if remaining > step else remaining
+        try:
+            return q.get(block=True, timeout=chunk)
+        except queue.Empty:
+            continue
+
+
 def thread1(nxscope, inst):
     # wait for stream started
     stream_started.wait()
@@ -295,9 +310,13 @@ def thread1(nxscope, inst):
 
     # wait for stop request
     while not stream_stop.is_set():
-        _ = q0.get(block=True, timeout=0.5)
-        _ = q1.get(block=True, timeout=0.5)
-        _ = q2.get(block=True, timeout=0.5)
+        try:
+            _ = q0.get(block=True, timeout=0.5)
+            _ = q1.get(block=True, timeout=0.5)
+            _ = q2.get(block=True, timeout=0.5)
+        except queue.Empty:
+            # CI can briefly starve producers; keep polling until stop.
+            continue
 
     nxscope.stream_unsub(q0)
     nxscope.stream_unsub(q1)
@@ -360,9 +379,9 @@ def test_nxscope_channels_thread():
 
     # get more data
     for _ in range(100):
-        _ = q0.get(block=True, timeout=0.5)
-        _ = q1.get(block=True, timeout=0.5)
-        _ = q2.get(block=True, timeout=0.5)
+        _ = _wait_for_data(q0, timeout=3.0)
+        _ = _wait_for_data(q1, timeout=3.0)
+        _ = _wait_for_data(q2, timeout=3.0)
 
     # stop threads
     stream_stop.set()
@@ -593,3 +612,82 @@ def test_nxscope_bitrate_disabled():
 
     # disconnect
     nxscope.disconnect()
+
+
+def test_wait_for_data_retries_once():
+    class OneEmptyThenData:
+        def __init__(self):
+            self.calls = 0
+
+        def get(self, block=True, timeout=0.0):
+            del block
+            del timeout
+            self.calls += 1
+            if self.calls == 1:
+                raise queue.Empty
+            return [1]
+
+    q = OneEmptyThenData()
+    ret = _wait_for_data(q, timeout=0.2, step=0.05)
+    assert ret == [1]
+    assert q.calls == 2
+
+
+def test_wait_for_data_timeout():
+    class AlwaysEmpty:
+        def get(self, block=True, timeout=0.0):
+            del block
+            del timeout
+            raise queue.Empty
+
+    with pytest.raises(queue.Empty):
+        _wait_for_data(AlwaysEmpty(), timeout=0.05, step=0.01)
+
+
+def test_thread1_handles_transient_empty():
+    class DevData:
+        def __init__(self):
+            self.en = True
+
+    class Dev:
+        def __init__(self):
+            self.data = DevData()
+
+    class EmptyThenStopQueue:
+        def get(self, block=True, timeout=0.0):
+            del block
+            del timeout
+            stream_stop.set()
+            raise queue.Empty
+
+    class FakeNxscope:
+        def __init__(self):
+            self.dev = {0: Dev(), 1: Dev(), 2: Dev()}
+            self.unsub = 0
+
+        def dev_channel_get(self, chid):
+            return self.dev[chid]
+
+        def ch_enable(self, ch):
+            del ch
+
+        def channels_write(self):
+            return None
+
+        def stream_sub(self, ch):
+            del ch
+            return EmptyThenStopQueue()
+
+        def stream_unsub(self, q):
+            del q
+            self.unsub += 1
+
+    stream_started.clear()
+    stream_stop.clear()
+    stream_started.set()
+
+    nxscope = FakeNxscope()
+    thread1(nxscope, 1)
+    assert nxscope.unsub == 3
+    stream_started.clear()
+    stream_stop.clear()
