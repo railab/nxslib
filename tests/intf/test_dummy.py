@@ -1,4 +1,8 @@
-from nxslib.dev import DDeviceChannelFuncData, DeviceChannel
+from nxslib.dev import (
+    DDeviceChannelFuncData,
+    DeviceChannel,
+    EDeviceChannelType,
+)
 from nxslib.intf.dummy import (
     ChannelFunc0,
     ChannelFunc1,
@@ -103,3 +107,24 @@ def test_dummy_channelfunc():  # noqa: C901
     assert isinstance(c.get(0), DDeviceChannelFuncData)
     for x in range(1001):
         _ = c.get(x)
+
+
+def test_dummy_divider_affects_stream_rate():
+    channel = DeviceChannel(
+        chan=0,
+        _type=EDeviceChannelType.FLOAT.value,
+        vdim=1,
+        name="chan0",
+        en=True,
+        div=0,
+        func=ChannelFunc0(),
+    )
+    dev = DummyDev(chmax=1, channels=[channel], stream_snum=1)
+
+    full_rate = dev._stream_data_get(20)
+    assert len(full_rate) == 20
+
+    channel.data.div = 4
+    dev._div_counters = [0]
+    reduced_rate = dev._stream_data_get(20)
+    assert len(reduced_rate) == 4

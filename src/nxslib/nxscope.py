@@ -178,7 +178,7 @@ class NxscopeHandler:
 
     def __del__(self) -> None:
         """Make sure to disconnect from dev."""
-        self.disconnect()
+        self.disconnect()  # pragma: no cover
 
     def _stream_start(self) -> bool:
         """Start stream request."""
