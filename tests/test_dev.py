@@ -4,6 +4,7 @@ from nxslib.dev import (
     DDeviceChannelData,
     Device,
     DeviceChannel,
+    EDeviceChannelType,
     IDeviceChannelFunc,
 )
 
@@ -153,6 +154,13 @@ def test_nxsdevchannel_func():
     assert ch2.data_get() == 3
     ch2.reset()
     assert ch2.data_get() == 0
+
+
+def test_edevicechanneltype_to_text():
+    assert (
+        EDeviceChannelType.to_text(EDeviceChannelType.INT16.value) == "INT16"
+    )
+    assert EDeviceChannelType.to_text(99) == "TYPE_99"
 
 
 # test dev init
