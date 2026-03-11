@@ -322,6 +322,7 @@ class DummyDev(ICommInterface):
         self._qread: queue.Queue[bytes] = queue.Queue()
 
         self._stream_started = Event()
+        self._div_counters = [0 for _ in range(self._dummydev.data.chmax)]
 
         self._parse: ParseRecv | None = None
 
@@ -369,6 +370,7 @@ class DummyDev(ICommInterface):
                 chan = self._dummydev.channel_get(chid)
                 assert chan
                 chan.data.div = div
+                self._div_counters[chid] = 0
 
             if self._dummydev.data.ack_supported:
                 _bytes = self._parse.frame_ack_encode(0)
@@ -401,6 +403,16 @@ class DummyDev(ICommInterface):
                     assert chan
 
                     if chan.data.en is True:
+                        div = int(chan.data.div)
+                        take = True
+                        if div > 0:
+                            counter = self._div_counters[chid]
+                            take = (counter % (div + 1)) == 0
+                            self._div_counters[chid] = counter + 1
+
+                        if not take:
+                            continue
+
                         data = chan.data_get()
                         if data:
                             sample = DParseStreamData(
@@ -474,6 +486,7 @@ class DummyDev(ICommInterface):
         with self._dummydev_lock:
             # reset dev state
             self._dummydev.reset()
+            self._div_counters = [0 for _ in range(self._dummydev.data.chmax)]
 
         self._thrd_recv.thread_start()
         self._thrd_stream.thread_start()
