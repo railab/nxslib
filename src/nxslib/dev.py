@@ -52,6 +52,14 @@ class EDeviceChannelType(Enum):
 
     # max possible = 31
 
+    @classmethod
+    def to_text(cls, dtype: int) -> str:
+        """Convert channel dtype number to human-readable label."""
+        try:
+            return cls(dtype).name
+        except ValueError:
+            return f"TYPE_{dtype}"
+
 
 ###############################################################################
 # Enum: EDeviceFlags
