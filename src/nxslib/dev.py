@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, IntFlag
 from threading import Lock
 from typing import Any
 
@@ -66,7 +66,7 @@ class EDeviceChannelType(Enum):
 ###############################################################################
 
 
-class EDeviceFlags(Enum):
+class EDeviceFlags(IntFlag):
     """A NxScope device flags."""
 
     NONE = 0
