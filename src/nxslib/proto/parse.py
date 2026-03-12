@@ -220,7 +220,7 @@ class Parser(ICommParse):
 
             samples.append(sample)
 
-        # return samples data and flags (always firtst byte in stream data)
+        # return samples data and flags (always first byte in stream data)
         return DParseStream(flags=frame.data[0], samples=samples)
 
     def frame_cmninfo_decode(self, frame: DParseFrame) -> ParseCmninfo | None:

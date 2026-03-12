@@ -382,7 +382,7 @@ class NxscopeHandler:
     def stream_start(self) -> None:
         """Start a data stream.
 
-        Before starting the stream, the bufferd channel configuration
+        Before starting the stream, the buffered channel configuration
         is applied to the device.
         """
         if not self._stream_started:
