@@ -44,14 +44,25 @@ class DCommChannelsData:
 class CommHandler:
     """A class implementing the Nxslib communication glue logic."""
 
-    def __init__(self, intf: "ICommInterface", parse: ICommParse):
+    def __init__(
+        self,
+        intf: "ICommInterface",
+        parse: ICommParse,
+        drop_timeout: float = 0.1,
+        stream_data_timeout: float = 1.0,
+    ):
         """Initialize communication glue logic.
 
         :param intf: instance of a communication interface
         :param parse: instance of a parser class
+        :param drop_timeout: timeout used in _drop_all_frames queue drains
+        :param stream_data_timeout: timeout used in stream_data() frame wait
         """
         # started flag
         self._started = False
+
+        self._drop_timeout = drop_timeout
+        self._stream_data_timeout = stream_data_timeout
 
         self._thrd = ThreadCommon(self._recv_thread, name="recv")
 
@@ -198,12 +209,12 @@ class CommHandler:
     def _drop_all_frames(self) -> None:
         cntr = 4
         while cntr > 0:
-            ret = self._get_frame(timeout=0.1)
+            ret = self._get_frame(timeout=self._drop_timeout)
             if not ret:  # pragma: no cover
                 cntr -= 1
         cntr = 4
         while cntr > 0:
-            ret = self._get_stream_frame(timeout=0.1)
+            ret = self._get_stream_frame(timeout=self._drop_timeout)
             if not ret:  # pragma: no cover
                 cntr -= 1
 
@@ -466,7 +477,7 @@ class CommHandler:
         assert self.dev
 
         # separate queue for stream frames
-        frame = self._get_stream_frame()
+        frame = self._get_stream_frame(timeout=self._stream_data_timeout)
         if not frame:
             return None
 

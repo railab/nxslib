@@ -152,6 +152,8 @@ class NxscopeHandler:
         intf: "ICommInterface",
         parse: "ICommParse",
         enable_bitrate_tracking: bool = False,
+        drop_timeout: float = 0.1,
+        stream_data_timeout: float = 1.0,
     ) -> None:
         """Initialize the Nxslib handler.
 
@@ -159,9 +161,16 @@ class NxscopeHandler:
         :param parse: Protocol parser
         :param enable_bitrate_tracking: Enable bitrate tracking
             (default: False)
+        :param drop_timeout: timeout used in _drop_all_frames queue drains
+        :param stream_data_timeout: timeout used in stream_data() frame wait
         """
         self._connected: bool = False
-        self._comm = CommHandler(intf, parse)
+        self._comm = CommHandler(
+            intf,
+            parse,
+            drop_timeout=drop_timeout,
+            stream_data_timeout=stream_data_timeout,
+        )
 
         self._thrd = ThreadCommon(self._stream_thread, name="stream")
 
