@@ -4,7 +4,7 @@ import copy
 import queue
 from dataclasses import dataclass
 from threading import Lock
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from nxslib.dev import Device, DeviceChannel
 from nxslib.logger import logger
@@ -19,6 +19,8 @@ from nxslib.proto.iparse import (
 from nxslib.thread import ThreadCommon
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from nxslib.intf.iintf import ICommInterface
 
 ###############################################################################
@@ -359,54 +361,63 @@ class CommHandler:
 
         return self._parse.frame_chinfo_decode(fread, chan)
 
+    def _send_channels_config(
+        self,
+        now: "list[Any]",
+        new: "list[Any]",
+        send_fn: "Callable[[Any], ParseAck]",
+        update_fn: "Callable[[list[Any]], None]",
+    ) -> None:
+        """Send single or bulk channel config frame and update applied state.
+
+        Caller must hold _channels_lock.
+
+        :param now: currently-applied state list (updated in-place on success)
+        :param new: buffered state list to apply
+        :param send_fn: callable accepting a single tuple or bulk list
+        :param update_fn: callable to propagate new state to the device model
+        """
+        changed_count = 0
+        changed_idx = 0
+        for i in range(len(now)):
+            if new[i] != now[i]:
+                changed_count += 1
+                changed_idx = i
+
+        if changed_count == 1:
+            ret = send_fn((changed_idx, new[changed_idx]))
+        else:
+            ret = send_fn(new)
+
+        if ret.state is False:  # pragma: no cover
+            return
+
+        now[:] = copy.deepcopy(new)
+        update_fn(now)
+
     def _nxslib_channels_enable(self) -> None:
+        """Send nxslib channel enable."""
         with self._channels_lock:
             assert self._channels
-            j = 0
-            k = 0
-            for i, _ in enumerate(self._channels.en_now):
-                if self._channels.en_new[i] != self._channels.en_now[i]:
-                    j += 1
-                    k = i
-
-            if j == 1:
-                en_req_t = (k, self._channels.en_new[k])
-                ret = self._channel_enable(en_req_t)
-            else:
-                en_req_l = self._channels.en_new
-                ret = self._channel_enable(en_req_l)
-            if ret.state is False:  # pragma: no cover
-                return
-
-            # update states
-            self._channels.en_now = copy.deepcopy(self._channels.en_new)
             assert self.dev
-            self.dev.en_channels_update(self._channels.en_now)
+            self._send_channels_config(
+                self._channels.en_now,
+                self._channels.en_new,
+                self._channel_enable,
+                self.dev.en_channels_update,
+            )
 
     def _nxslib_channels_div(self) -> None:
         """Send nxslib div."""
         with self._channels_lock:
             assert self._channels
-            j = 0
-            k = 0
-            for i, _ in enumerate(self._channels.div_now):
-                if self._channels.div_new[i] != self._channels.div_now[i]:
-                    j += 1
-                    k = i
-
-            if j == 1:
-                div_req_t = (k, self._channels.div_new[k])
-                ret = self._channel_div(div_req_t)
-            else:
-                div_req_l = self._channels.div_new
-                ret = self._channel_div(div_req_l)
-            if ret.state is False:  # pragma: no cover
-                return
-
-            # update states
-            self._channels.div_now = copy.deepcopy(self._channels.div_new)
             assert self.dev
-            self.dev.div_channels_update(self._channels.div_now)
+            self._send_channels_config(
+                self._channels.div_now,
+                self._channels.div_new,
+                self._channel_div,
+                self.dev.div_channels_update,
+            )
 
     def _ch_divider_default(self) -> None:
         """Set all channels divider to default."""
