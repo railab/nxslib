@@ -350,7 +350,7 @@ class NxscopeHandler:
             logger.info("WARNING: ALREADY CONNECTED!")
             return self._comm.dev
 
-        logger.info("pintf.py: connect")
+        logger.info("Connecting to NxScope device")
         self._comm.connect()
 
         # create lists for samples queues
