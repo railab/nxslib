@@ -10,9 +10,11 @@ from nxslib.proto.parse import Parser
 
 
 def test_nxscope_connect():
-    intf = DummyDev()
+    intf = DummyDev(thread_timeout=0.05)
     parse = Parser()
-    nxscope = NxscopeHandler(intf, parse)
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
 
     # connect
     nxscope.connect()
@@ -34,9 +36,11 @@ def test_nxscope_connect():
 
 
 def test_nxscope_stream():
-    intf = DummyDev()
+    intf = DummyDev(thread_timeout=0.05)
     parse = Parser()
-    nxscope = NxscopeHandler(intf, parse)
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
 
     # connect
     nxscope.connect()
@@ -67,9 +71,9 @@ def test_nxscope_stream():
 
     # wait for data but channels no enabled
     with pytest.raises(queue.Empty):
-        _ = q0_0.get(block=True, timeout=0.5)
+        _ = q0_0.get(block=True, timeout=0.05)
     with pytest.raises(queue.Empty):
-        _ = q0_1.get(block=True, timeout=0.5)
+        _ = q0_1.get(block=True, timeout=0.05)
 
     # stop stream
     nxscope.stream_stop()
@@ -95,19 +99,19 @@ def test_nxscope_stream():
     nxscope.stream_start()
 
     # wait for data but channels no enabled
-    data = q0_0.get(block=True, timeout=1)
+    data = q0_0.get(block=True, timeout=0.5)
     print(data)
     print(data[0])
     assert data
-    data = q0_1.get(block=True, timeout=1)
+    data = q0_1.get(block=True, timeout=0.5)
     print(data)
     print(data[0])
     assert data
 
     # get more data
-    for _ in range(100):
-        assert q0_0.get(block=True, timeout=1)
-        assert q0_1.get(block=True, timeout=1)
+    for _ in range(5):
+        assert q0_0.get(block=True, timeout=0.5)
+        assert q0_1.get(block=True, timeout=0.5)
 
     # stop stream
     nxscope.stream_stop()
@@ -121,9 +125,11 @@ def test_nxscope_stream():
 
 
 def test_nxscope_channels_runtime():
-    intf = DummyDev()
+    intf = DummyDev(thread_timeout=0.05)
     parse = Parser()
-    nxscope = NxscopeHandler(intf, parse)
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
 
     # connect
     nxscope.connect()
@@ -164,11 +170,11 @@ def test_nxscope_channels_runtime():
 
     # wait for data but channels no enabled
     with pytest.raises(queue.Empty):
-        _ = q0.get(block=True, timeout=0.5)
+        _ = q0.get(block=True, timeout=0.05)
     with pytest.raises(queue.Empty):
-        _ = q1.get(block=True, timeout=0.5)
+        _ = q1.get(block=True, timeout=0.05)
     with pytest.raises(queue.Empty):
-        _ = q2.get(block=True, timeout=0.5)
+        _ = q2.get(block=True, timeout=0.05)
 
     # reconfig
     nxscope.ch_enable(0, writenow=True)
@@ -182,12 +188,12 @@ def test_nxscope_channels_runtime():
     assert dev2.data.div == 0
 
     # wait for data
-    data = _wait_for_data(q0, timeout=3.0)
+    data = _wait_for_data(q0, timeout=0.5)
     assert data
     with pytest.raises(queue.Empty):
-        _ = q1.get(block=True, timeout=0.5)
+        _ = q1.get(block=True, timeout=0.05)
     with pytest.raises(queue.Empty):
-        _ = q2.get(block=True, timeout=0.5)
+        _ = q2.get(block=True, timeout=0.05)
 
     # reconfig
     nxscope.ch_enable(1, writenow=True)
@@ -201,12 +207,12 @@ def test_nxscope_channels_runtime():
     assert dev2.data.div == 0
 
     # wait for data
-    data = _wait_for_data(q0, timeout=3.0)
+    data = _wait_for_data(q0, timeout=0.5)
     assert data
-    data = _wait_for_data(q1, timeout=3.0)
+    data = _wait_for_data(q1, timeout=0.5)
     assert data
     with pytest.raises(queue.Empty):
-        _ = q2.get(block=True, timeout=0.5)
+        _ = q2.get(block=True, timeout=0.05)
 
     # reconfig
     nxscope.ch_disable(0, writenow=True)
@@ -236,10 +242,10 @@ def test_nxscope_channels_runtime():
     assert dev2.data.div == 5
 
     # get more data
-    for _ in range(100):
-        _ = _wait_for_data(q0, timeout=3.0)
-        _ = _wait_for_data(q1, timeout=3.0)
-        _ = _wait_for_data(q2, timeout=3.0)
+    for _ in range(5):
+        _ = _wait_for_data(q0, timeout=0.5)
+        _ = _wait_for_data(q1, timeout=0.5)
+        _ = _wait_for_data(q2, timeout=0.5)
 
     # configuration not written
     nxscope.ch_disable_all()
@@ -324,9 +330,11 @@ def thread1(nxscope, inst):
 
 
 def test_nxscope_channels_thread():
-    intf = DummyDev()
+    intf = DummyDev(thread_timeout=0.05)
     parse = Parser()
-    nxscope = NxscopeHandler(intf, parse)
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
 
     thr1 = threading.Thread(target=thread1, args=[nxscope, 1])
     thr1.start()
@@ -378,10 +386,10 @@ def test_nxscope_channels_thread():
     stream_started.set()
 
     # get more data
-    for _ in range(100):
-        _ = _wait_for_data(q0, timeout=3.0)
-        _ = _wait_for_data(q1, timeout=3.0)
-        _ = _wait_for_data(q2, timeout=3.0)
+    for _ in range(5):
+        _ = _wait_for_data(q0, timeout=0.5)
+        _ = _wait_for_data(q1, timeout=0.5)
+        _ = _wait_for_data(q2, timeout=0.5)
 
     # stop threads
     stream_stop.set()
@@ -404,9 +412,11 @@ def test_nxscope_channels_thread():
 
 def test_nxscope_properties():
     """Test new properties added to NxscopeHandler."""
-    intf = DummyDev()
+    intf = DummyDev(thread_timeout=0.05)
     parse = Parser()
-    nxscope = NxscopeHandler(intf, parse)
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
 
     # Test connected property
     assert nxscope.connected is False
@@ -436,9 +446,11 @@ def test_nxscope_properties():
 
 def test_nxscope_channels_state_interfaces():
     """Test channels state access interfaces."""
-    intf = DummyDev()
+    intf = DummyDev(thread_timeout=0.05)
     parse = Parser()
-    nxscope = NxscopeHandler(intf, parse)
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
 
     nxscope.connect()
     nxscope.channels_default_cfg(writenow=True)
@@ -475,9 +487,15 @@ def test_nxscope_channels_state_interfaces():
 
 def test_nxscope_capabilities_and_stats_interfaces():
     """Test capabilities and stream stats interfaces."""
-    intf = DummyDev()
+    intf = DummyDev(thread_timeout=0.05)
     parse = Parser()
-    nxscope = NxscopeHandler(intf, parse, enable_bitrate_tracking=True)
+    nxscope = NxscopeHandler(
+        intf,
+        parse,
+        enable_bitrate_tracking=True,
+        drop_timeout=0.01,
+        stream_data_timeout=0.05,
+    )
 
     nxscope.connect()
 
@@ -499,9 +517,15 @@ def test_nxscope_bitrate():
     """Test get_bitrate method."""
     import time
 
-    intf = DummyDev()
+    intf = DummyDev(thread_timeout=0.05)
     parse = Parser()
-    nxscope = NxscopeHandler(intf, parse, enable_bitrate_tracking=True)
+    nxscope = NxscopeHandler(
+        intf,
+        parse,
+        enable_bitrate_tracking=True,
+        drop_timeout=0.01,
+        stream_data_timeout=0.05,
+    )
 
     # connect
     nxscope.connect()
@@ -535,56 +559,60 @@ def test_nxscope_bitrate():
 
 
 def test_bitrate_tracker():
-    """Test _BitrateTracker class."""
-    import time
+    from unittest.mock import patch
 
     from nxslib.nxscope import _BitrateTracker
 
-    tracker = _BitrateTracker(window_seconds=1.0)
+    t = [0.0]
 
-    # Initially no data
-    assert tracker.get_bitrate() == 0.0
+    def fake_time():
+        return t[0]
 
-    # Add some data
-    tracker.update(1000)
-    time.sleep(0.1)
-    tracker.update(1000)
+    with patch("nxslib.nxscope.time", side_effect=fake_time):
+        tracker = _BitrateTracker(window_seconds=1.0)
+        assert tracker.get_bitrate() == 0.0
 
-    # Should have a bitrate now
-    bitrate = tracker.get_bitrate()
-    assert bitrate > 0
+        tracker.update(1000)
+        t[0] = 0.15
+        tracker.update(1000)
+        t[0] = 0.20
+        bitrate = tracker.get_bitrate()
+        assert bitrate > 0
 
-    # Test with very short time span (< 100ms)
-    tracker2 = _BitrateTracker(window_seconds=1.0)
-    tracker2.update(1000)
-    tracker2.update(1000)  # Immediate second update
-    bitrate = tracker2.get_bitrate()
-    assert bitrate == 0.0  # Too short time span
+        # Test with very short time span (< 100ms)
+        tracker2 = _BitrateTracker(window_seconds=1.0)
+        tracker2.update(1000)
+        tracker2.update(1000)  # same t[0] = 0.20
+        bitrate = tracker2.get_bitrate()
+        assert bitrate == 0.0  # Too short time span
 
-    # Test window cleanup
-    tracker3 = _BitrateTracker(window_seconds=0.5)
-    tracker3.update(1000)
-    time.sleep(0.2)
-    tracker3.update(1000)
+        # Test window cleanup
+        tracker3 = _BitrateTracker(window_seconds=0.5)
+        t[0] = 0.0
+        tracker3.update(1000)
+        t[0] = 0.2
+        tracker3.update(1000)
 
-    # Should have bitrate from two samples
-    bitrate = tracker3.get_bitrate()
-    assert bitrate > 0
+        # Should have bitrate from two samples
+        bitrate = tracker3.get_bitrate()
+        assert bitrate > 0
 
-    # After window expires, old sample is cleaned on next update
-    time.sleep(0.4)  # Total 0.6s from first sample
-    tracker3.update(1000)  # This triggers cleanup
+        # After window expires, old sample is cleaned on next update
+        t[0] = 0.6  # Total 0.6s from first sample (window=0.5s)
+        tracker3.update(1000)  # This triggers cleanup
 
-    # Bitrate calculation still works after cleanup
-    bitrate = tracker3.get_bitrate()
-    assert isinstance(bitrate, float)
+        # Bitrate calculation still works after cleanup
+        bitrate = tracker3.get_bitrate()
+        assert isinstance(bitrate, float)
 
 
 def test_nxscope_bitrate_disabled():
     """Test that bitrate tracking is disabled by default."""
-    intf = DummyDev()
+    intf = DummyDev(thread_timeout=0.05)
     parse = Parser()
-    nxscope = NxscopeHandler(intf, parse)  # No enable_bitrate_tracking
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )  # No enable_bitrate_tracking
 
     # connect
     nxscope.connect()

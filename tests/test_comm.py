@@ -8,18 +8,18 @@ from nxslib.proto.parse import Parser
 
 
 def test_nxslib_init():
-    i = DummyDev()
+    i = DummyDev(thread_timeout=0.05)
     p = Parser()
 
-    comm = CommHandler(i, p)
+    comm = CommHandler(i, p, drop_timeout=0.01, stream_data_timeout=0.05)
     assert isinstance(comm, CommHandler)
 
 
 @pytest.fixture
 def comm():
-    i = DummyDev()
+    i = DummyDev(thread_timeout=0.05)
     p = Parser()
-    return CommHandler(i, p)
+    return CommHandler(i, p, drop_timeout=0.01, stream_data_timeout=0.05)
 
 
 def test_nxslib_connect(comm):
@@ -326,9 +326,9 @@ def test_nxslib_stream_ch8(comm):
 
 
 def test_nxslib_nodiv(comm):
-    i = DummyDev(flags=EDeviceFlags.ACK_SUPPORT.value)
+    i = DummyDev(flags=EDeviceFlags.ACK_SUPPORT.value, thread_timeout=0.05)
     p = Parser()
-    comm = CommHandler(i, p)
+    comm = CommHandler(i, p, drop_timeout=0.01, stream_data_timeout=0.05)
 
     # connect
     comm.connect()
@@ -348,9 +348,9 @@ def test_nxslib_nodiv(comm):
 
 
 def test_nxslib_noack(comm):
-    i = DummyDev(flags=EDeviceFlags.DIVIDER_SUPPORT.value)
+    i = DummyDev(flags=EDeviceFlags.DIVIDER_SUPPORT.value, thread_timeout=0.05)
     p = Parser()
-    comm = CommHandler(i, p)
+    comm = CommHandler(i, p, drop_timeout=0.01, stream_data_timeout=0.05)
 
     # connect
     comm.connect()
@@ -371,9 +371,9 @@ def test_nxslib_noack(comm):
 
 def test_comm_get_enabled_channels():
     """Test get_enabled_channels method."""
-    i = DummyDev()
+    i = DummyDev(thread_timeout=0.05)
     p = Parser()
-    comm = CommHandler(i, p)
+    comm = CommHandler(i, p, drop_timeout=0.01, stream_data_timeout=0.05)
 
     # connect
     comm.connect()
