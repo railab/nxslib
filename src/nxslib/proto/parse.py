@@ -158,7 +158,7 @@ class Parser(ICommParse):
     ) -> DParseStream | None:
         """Decode a stream frame."""
         # no data
-        if not frame:
+        if frame is None:
             return None
 
         # invalid frame ID
