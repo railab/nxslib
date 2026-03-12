@@ -446,8 +446,10 @@ class CommHandler:
             # thread.thread_stop(). I wasn't able to find the real cause
             # of this problem.
             self._stop()
-        except RuntimeError:  # pragma: no cover
-            pass
+        except RuntimeError as exc:  # pragma: no cover
+            logger.warning(
+                "Unexpected RuntimeError during disconnect: %s", exc
+            )
 
     def flags_is_overflow(self, flag: int) -> bool:
         """Return stream OVERFLOW flag state.
