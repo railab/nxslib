@@ -248,11 +248,11 @@ class NxscopeHandler:
 
             with self._queue_lock:
                 # send all samples at once
-                for data.chan in range(chmax):
-                    if len(samples[data.chan]) > 0:
+                for chan_id in range(chmax):
+                    if len(samples[chan_id]) > 0:
                         # send for all subscribers
-                        for que in self._sub_q[data.chan]:
-                            que.put(samples[data.chan])
+                        for que in self._sub_q[chan_id]:
+                            que.put(samples[chan_id])
 
     def _reset_stats(self) -> None:
         with self._stats_lock:
