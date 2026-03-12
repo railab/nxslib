@@ -144,7 +144,7 @@ class CommHandler:
 
     def _read_hdr(self) -> tuple[DParseHdr, bytes] | tuple[None, None]:
         """Read hdr from interface."""
-        # look for hdr in the recieved data
+        # look for hdr in the received data
         while True:
             # start with previous data
             _bytes = self._prev_read
@@ -559,7 +559,7 @@ class CommHandler:
             self.ch_enable(chan)
 
     def ch_disable_all(self) -> None:
-        """Disale all channels."""
+        """Disable all channels."""
         assert self.dev
         for chan in range(self.dev.data.chmax):
             self.ch_disable(chan)

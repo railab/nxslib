@@ -58,7 +58,7 @@ class ChannelFunc1(IDeviceChannelFunc):
 
 
 class ChannelFunc2(IDeviceChannelFunc):
-    """Generate triange waveform."""
+    """Generate triangle waveform."""
 
     _cntr = 0
     _sign = 1
@@ -127,7 +127,7 @@ class ChannelFunc6(IDeviceChannelFunc):
 
     def get(self, _: int) -> DDeviceChannelFuncData | None:
         """Get sample data."""
-        # start from 0 - we want at leas one 'hello' emitted
+        # start from 0 - we want at least one 'hello' emitted
         if not self._cntr % 10000:
             self._cntr += 1
             text = "hello" + "\0" * 59
@@ -294,7 +294,7 @@ class DummyDev(ICommInterface):
         stream_snum: int = 100,
         thread_timeout: float = 1.0,
     ) -> None:
-        """Intitialize a dummy NxScope interface.
+        """Initialize a dummy NxScope interface.
 
         :param chmax: the number of supported channels
         :param flags: the device flags

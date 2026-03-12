@@ -1,4 +1,4 @@
-"""Module containint NxScope the device implementation."""
+"""Module containing NxScope the device implementation."""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -115,7 +115,7 @@ class DDeviceChannelData:
         """Make some field read-only."""
         if self._initdone:
             if name not in ["div", "en"]:
-                msg = name + " proprety is read-only"
+                msg = name + " property is read-only"
                 raise TypeError(msg)
         self.__dict__[name] = value
 
@@ -148,7 +148,7 @@ class DDeviceData:
         """Make some field read-only."""
         if self._initdone:
             # all fields read-only
-            msg = name + " proprety is read-only"
+            msg = name + " property is read-only"
             raise TypeError(msg)
         self.__dict__[name] = value
 
@@ -204,7 +204,7 @@ class DeviceChannel:
     ):
         """Initialize a NxScope device channel.
 
-        :param type: channel id
+        :param chan: channel id
         :param _type: channel type
         :param vdim: sample data dimension
         :param name: channel name
@@ -224,7 +224,7 @@ class DeviceChannel:
         self._cntr = 0
 
     def __str__(self) -> str:
-        """Get channel string represenation."""
+        """Get channel string representation."""
         _str = "DeviceChannel " + "(" + str(self.data) + ")"
         return _str
 
@@ -288,7 +288,7 @@ class Device:
         self._channels_lock = Lock()
 
     def __str__(self) -> str:
-        """Get device string represenation."""
+        """Get device string representation."""
         return "Device:" + " (" + str(self.data) + ")"
 
     @property
