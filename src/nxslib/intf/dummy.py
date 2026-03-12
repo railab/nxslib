@@ -292,6 +292,7 @@ class DummyDev(ICommInterface):
         rxpadding: int = 16,
         stream_sleep: float = 0.001,
         stream_snum: int = 100,
+        thread_timeout: float = 1.0,
     ) -> None:
         """Intitialize a dummy NxScope interface.
 
@@ -301,6 +302,7 @@ class DummyDev(ICommInterface):
         :param rxpadding: rxpadding - doesn't matter here
         :param stream_sleep: samples thread parameter
         :param stream_snum: samples thread parameter
+        :param thread_timeout: timeout for blocking thread operations
         """
         super().__init__()
         self._thrd_stream = ThreadCommon(
@@ -318,6 +320,7 @@ class DummyDev(ICommInterface):
         self._dummydev_lock = Lock()
         self._stream_sleep = stream_sleep
         self._stream_snum = stream_snum
+        self._thread_timeout = thread_timeout
         self._qwrite: queue.Queue[bytes] = queue.Queue()
         self._qread: queue.Queue[bytes] = queue.Queue()
 
@@ -428,7 +431,7 @@ class DummyDev(ICommInterface):
 
     def _thread_stream(self) -> None:
         assert self._parse
-        if self._stream_started.wait(timeout=1.0):
+        if self._stream_started.wait(timeout=self._thread_timeout):
             samples = self._stream_data_get(self._stream_snum)
             frame = self._parse.frame_stream_encode(samples)
             if frame is not None:  # pragma: no cover
@@ -442,7 +445,7 @@ class DummyDev(ICommInterface):
         try:
             # NOTE: timeout must be not zero otherwise we have
             #       deadlock when thread stop is requested
-            data = self._qwrite.get(block=True, timeout=1.0)
+            data = self._qwrite.get(block=True, timeout=self._thread_timeout)
         except queue.Empty:
             pass
 
@@ -498,7 +501,7 @@ class DummyDev(ICommInterface):
         """Interface specific read method."""
         data = b""
         try:
-            data = self._qread.get(block=True, timeout=1)
+            data = self._qread.get(block=True, timeout=self._thread_timeout)
         except queue.Empty:
             pass
 
