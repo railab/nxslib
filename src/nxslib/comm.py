@@ -83,8 +83,13 @@ class CommHandler:
         self._channels: DCommChannelsData
         self._channels_lock = Lock()
 
-    def __del__(self) -> None:
-        """Need to disconnect from the device."""
+    def __enter__(self) -> "CommHandler":
+        """Connect on context manager entry."""
+        self.connect()
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        """Disconnect on context manager exit."""
         self.disconnect()
 
     def _drop_all(self) -> None:

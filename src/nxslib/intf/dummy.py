@@ -329,8 +329,13 @@ class DummyDev(ICommInterface):
 
         self._parse: ParseRecv | None = None
 
-    def __del__(self) -> None:
-        """Make sure that interface is stoped."""
+    def __enter__(self) -> "DummyDev":
+        """Start on context manager entry."""
+        self.start()
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        """Stop on context manager exit."""
         self.stop()
 
     def _cmninfo_cb(self, data: bytes) -> None:

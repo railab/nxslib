@@ -81,8 +81,14 @@ class RTTDevice(ICommInterface):  # pragma: no cover
 
         super().__init__()
 
-    def __del__(self) -> None:
-        """Make sure that serial port is closed."""
+    def __enter__(self) -> "RTTDevice":
+        """Start on context manager entry."""
+        self.start()
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        """Stop on context manager exit."""
+        self.stop()
 
     def start(self) -> None:
         """Start the interface."""
