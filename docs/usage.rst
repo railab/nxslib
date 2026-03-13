@@ -123,6 +123,112 @@ All interface classes support the context manager protocol:
 Communication handler
 ---------------------
 
+User extensions and plugins
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Nxslib supports user-defined NxScope frame IDs (IDs ``>= 8``) for protocol
+extensions.
+
+Sending a user frame:
+
+.. code-block:: python
+
+   ack = nxscope.send_user_frame(
+       8,                       # user frame ID
+       b"\x01\x02\x03",         # payload
+       ack_mode="auto",         # auto | required | disabled
+       ack_timeout=1.0,
+   )
+
+Receiving user frames with a callback:
+
+.. code-block:: python
+
+   def on_user_frame(frame):
+       print(frame.fid, frame.data)
+       return True  # handled
+
+   listener_id = nxscope.add_user_frame_listener(on_user_frame, frame_ids=[8])
+   # ...
+   nxscope.remove_user_frame_listener(listener_id)
+
+Plugin registration API:
+
+.. code-block:: python
+
+   from nxslib.plugin import INxscopePlugin
+
+   class MyPlugin(INxscopePlugin):
+       name = "my_plugin"
+
+       def on_register(self, control):
+           self.control = control
+
+       def on_user_frame(self, frame):
+           return False
+
+   plugin = MyPlugin()
+   nxscope.register_plugin(plugin, frame_ids=[8, 9])
+   # ...
+   nxscope.unregister_plugin("my_plugin")
+
+Plugins can also create and publish extension channels
+(protocol agnostic):
+
+.. code-block:: python
+
+   from nxslib.nxscope import DNxscopeStream
+
+   nxscope.ext_channel_add(200)
+   q = nxscope.stream_sub(200)
+   nxscope.ext_publish_legacy(200, DNxscopeStream((1,), (0,)))
+
+Extension request broker (transport agnostic):
+
+.. code-block:: python
+
+   # namespace handler on receiving side
+   def on_ext(req):
+       if req.cmd_id == 1:       # set value
+           return b"ok"          # status=0, payload=b"ok"
+       return (1, b"unknown")    # non-zero status => error response
+
+   nxscope.ext_bind(0x21, on_ext)
+
+   # one-way notify
+   nxscope.ext_notify(0x21, 2, b"fire", ack_mode="auto")
+
+   # raw request/response (independent from ACK support)
+   resp = nxscope.ext_request(
+       0x21,
+       1,
+       b"\x10\x20",
+       timeout=0.5,
+       ack_mode="auto",          # can be disabled/required/auto
+   )
+   print(resp.status, resp.payload)
+
+   # helper API: returns payload or raises DExtCallError
+   data = nxscope.ext_call(
+       0x21,
+       1,
+       b"\x10\x20",
+       timeout=0.5,
+       ack_mode="auto",
+   )
+
+   # typed helper
+   value = nxscope.ext_call_decode(
+       0x21,
+       3,
+       b"",
+       decode=lambda raw: int.from_bytes(raw, "little"),
+   )
+
+The extension broker lives in ``nxslib`` and works with any NxScope transport
+(``serial``, ``udp``, ``rtt``, and future interfaces) because transport access
+is owned by one ``NxscopeHandler`` instance.
+
 Parser
 ^^^^^^
 
