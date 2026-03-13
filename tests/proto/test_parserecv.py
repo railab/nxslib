@@ -1,7 +1,7 @@
 import pytest  # type: ignore
 
 from nxslib.dev import Device, DeviceChannel, EDeviceChannelType
-from nxslib.proto.iframe import EParseId
+from nxslib.proto.iframe import DParseHdr, EParseError, EParseId
 from nxslib.proto.iparse import (
     DParseStreamData,
     DsfmtItem,
@@ -251,3 +251,15 @@ def test_nxslibparserecv_encode_user():
         ),
     ]
     assert recv.frame_stream_encode(samples) is not None
+
+
+def test_nxslibparserecv_recv_header_decode_error():
+    recv_cb = ParseRecvCb(cb_cmninfo, cb_chinfo, cb_enable, cb_div, cb_start)
+    recv = ParseRecv(recv_cb, SerialFrame)
+    parser = Parser(SerialFrame)
+
+    _bytes = parser.frame_cmninfo()
+    recv._frame.hdr_decode = lambda _data: DParseHdr(
+        fid=0, flen=0, err=EParseError.ERR
+    )
+    assert recv.recv_handle(_bytes) is None

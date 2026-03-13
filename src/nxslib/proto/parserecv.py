@@ -168,7 +168,7 @@ class ParseRecv(ICommParseRecv):
         assert len(data) == 1
         self._recv_cb.start(data)
 
-    def _recv_cb_handle(self, fid: EParseId, fdata: bytes) -> None:
+    def _recv_cb_handle(self, fid: int, fdata: bytes) -> None:
         # STREAM frames are not accepted here
         if fid == EParseId.CMNINFO:
             self._recv_cb_cmninfo(fdata)

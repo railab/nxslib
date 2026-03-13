@@ -2,10 +2,19 @@ import queue
 import threading
 import time
 
+import numpy as np
 import pytest  # type: ignore
 
 from nxslib.intf.dummy import DummyDev
-from nxslib.nxscope import DNxscopeStream, NxscopeHandler
+from nxslib.nxscope import (
+    DExtCallError,
+    DNxscopeStream,
+    DNxscopeStreamBlock,
+    NxscopeHandler,
+)
+from nxslib.plugin import INxscopePlugin
+from nxslib.proto.iframe import DParseFrame
+from nxslib.proto.iparse import ParseAck
 from nxslib.proto.parse import Parser
 
 
@@ -783,3 +792,727 @@ def test_thread1_handles_transient_empty():
     assert nxscope.unsub == 3
     stream_started.clear()
     stream_stop.clear()
+
+
+def test_nxscope_plugin_lifecycle_and_user_api():
+    class TestPlugin(INxscopePlugin):
+        name = "test_plugin"
+
+        def __init__(self):
+            self.events = []
+
+        def on_register(self, nxscope):
+            self.events.append("register")
+
+        def on_unregister(self):
+            self.events.append("unregister")
+
+        def on_connect(self, dev):
+            del dev
+            self.events.append("connect")
+
+        def on_disconnect(self):
+            self.events.append("disconnect")
+
+        def on_user_frame(self, frame):
+            self.events.append(f"user:{int(frame.fid)}")
+            return True
+
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+    plugin = TestPlugin()
+
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
+
+    nxscope.register_plugin(plugin, frame_ids=[8])
+    assert "register" in plugin.events
+
+    nxscope.connect()
+    assert "connect" in plugin.events
+    assert (
+        nxscope._comm._dispatch_user_frame(DParseFrame(fid=8, data=b"\x01"))
+        is True
+    )
+    assert "user:8" in plugin.events
+
+    calls = []
+
+    def fake_send(
+        fid, payload, ack_mode="auto", ack_timeout=1.0
+    ):  # pragma: no cover
+        calls.append((fid, payload, ack_mode, ack_timeout))
+        return None
+
+    nxscope._comm.send_user_frame = fake_send  # type: ignore[attr-defined]
+    nxscope.send_user_frame(8, b"\x11\x22", ack_mode="disabled")
+    assert calls == [(8, b"\x11\x22", "disabled", 1.0)]
+
+    nxscope.disconnect()
+    assert "disconnect" in plugin.events
+
+    assert nxscope.unregister_plugin("test_plugin") is True
+    assert "unregister" in plugin.events
+    assert nxscope.unregister_plugin("test_plugin") is False
+
+
+def test_nxscope_plugin_default_interface():
+    plugin = INxscopePlugin()
+    assert plugin.on_register(None) is None  # type: ignore[arg-type]
+    assert plugin.on_unregister() is None
+    assert plugin.on_connect(None) is None  # type: ignore[arg-type]
+    assert plugin.on_disconnect() is None
+    assert plugin.on_user_frame(DParseFrame(fid=8, data=b"\x00")) is False
+
+
+def test_nxscope_ext_channel_publish_legacy():
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+
+    with NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    ) as nxscope:
+        nxscope.ext_channel_add(200)
+        q = nxscope.stream_sub(200)
+
+        nxscope.ext_publish_legacy(200, DNxscopeStream((1, 2), (3,)))
+        data = q.get(block=True, timeout=0.1)
+        assert len(data) == 1
+        assert isinstance(data[0], DNxscopeStream)
+        assert data[0].data == (1, 2)
+
+        nxscope.stream_unsub(q)
+
+
+def test_nxscope_ext_channel_publish_numpy():
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+
+    with NxscopeHandler(
+        intf,
+        parse,
+        stream_decode_mode="numpy",
+        drop_timeout=0.01,
+        stream_data_timeout=0.05,
+    ) as nxscope:
+        nxscope.ext_channel_add(201)
+        q = nxscope.stream_sub(201)
+
+        block = DNxscopeStreamBlock(
+            data=np.array([1, 2, 3], dtype=np.int32),
+            meta=None,
+        )
+        nxscope.ext_publish_numpy(201, block)
+        data = q.get(block=True, timeout=0.1)
+        assert len(data) == 1
+        assert isinstance(data[0], DNxscopeStreamBlock)
+        assert int(data[0].data[1]) == 2
+
+        nxscope.stream_unsub(q)
+
+
+def test_nxscope_plugin_register_duplicate_and_rollback():
+    class DuplicatePlugin(INxscopePlugin):
+        name = "dup"
+
+    class FailingPlugin(INxscopePlugin):
+        name = "fail"
+
+        def __init__(self):
+            self.events = []
+
+        def on_register(self, nxscope):
+            del nxscope
+            self.events.append("register")
+            raise RuntimeError("boom")
+
+        def on_unregister(self):
+            self.events.append("unregister")
+
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
+
+    nxscope.register_plugin(DuplicatePlugin())
+    with pytest.raises(ValueError):
+        nxscope.register_plugin(DuplicatePlugin())
+    assert nxscope.unregister_plugin("dup") is True
+
+    failing = FailingPlugin()
+    with pytest.raises(RuntimeError):
+        nxscope.register_plugin(failing)
+    assert failing.events == ["register", "unregister"]
+    assert nxscope.unregister_plugin("fail") is False
+
+
+def test_nxscope_plugin_noncallable_hooks_and_connected_unregister():
+    class BarePlugin:
+        name = "bare"
+        on_register = None
+        on_unregister = None
+        on_connect = None
+        on_disconnect = None
+        on_user_frame = None
+
+    class DisconnectPlugin(INxscopePlugin):
+        name = "disc"
+
+        def __init__(self):
+            self.events = []
+
+        def on_disconnect(self):
+            self.events.append("disconnect")
+
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
+
+    nxscope.connect()
+    nxscope.register_plugin(BarePlugin())  # type: ignore[arg-type]
+    assert nxscope.unregister_plugin("bare") is True
+    nxscope.disconnect()
+
+    nxscope.connect()
+    disc = DisconnectPlugin()
+    nxscope.register_plugin(disc)
+    assert nxscope.unregister_plugin("disc") is True
+    assert disc.events == ["disconnect"]
+    nxscope.disconnect()
+
+
+def test_nxscope_connect_disconnect_noncallable_plugin_hooks():
+    class BarePlugin:
+        name = "bare_connect"
+        on_register = None
+        on_unregister = None
+        on_connect = None
+        on_disconnect = None
+        on_user_frame = None
+
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
+
+    nxscope.register_plugin(BarePlugin())  # type: ignore[arg-type]
+    nxscope.connect()
+    nxscope.disconnect()
+    assert nxscope.unregister_plugin("bare_connect") is True
+
+
+def test_nxscope_ext_request_response_roundtrip():
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
+
+    with nxscope:
+        captured = []
+        orig_send = nxscope._comm.send_user_frame
+
+        def fake_send(fid, payload, ack_mode="auto", ack_timeout=1.0):
+            captured.append((fid, payload, ack_mode, ack_timeout))
+            req = nxscope._ext_decode(fid, payload)
+            assert req is not None
+            assert req.flags & 0x01
+            resp_payload = nxscope._ext_encode(
+                ext_id=req.ext_id,
+                cmd_id=req.cmd_id,
+                flags=0x02,
+                req_id=req.req_id,
+                status=0,
+                payload=b"pong",
+            )
+            nxscope._ext_dispatch_frame(
+                DParseFrame(fid=fid, data=resp_payload)
+            )
+            return ParseAck(True, 0)
+
+        nxscope._comm.send_user_frame = fake_send
+        try:
+            resp = nxscope.ext_request(
+                ext_id=3,
+                cmd_id=7,
+                payload=b"ping",
+                ack_mode="disabled",
+                timeout=0.2,
+            )
+        finally:
+            nxscope._comm.send_user_frame = orig_send
+
+        assert captured
+        assert resp.ext_id == 3
+        assert resp.cmd_id == 7
+        assert resp.payload == b"pong"
+        assert resp.is_error is False
+
+
+def test_nxscope_ext_request_timeout():
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
+
+    with nxscope:
+        orig_send = nxscope._comm.send_user_frame
+        nxscope._comm.send_user_frame = (
+            lambda fid, payload, ack_mode="auto", ack_timeout=1.0: ParseAck(
+                True, 0
+            )
+        )
+        try:
+            with pytest.raises(TimeoutError):
+                nxscope.ext_request(
+                    ext_id=9,
+                    cmd_id=1,
+                    payload=b"\x00",
+                    ack_mode="disabled",
+                    timeout=0.01,
+                )
+        finally:
+            nxscope._comm.send_user_frame = orig_send
+
+
+def test_nxscope_ext_call_returns_payload():
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
+
+    with nxscope:
+        orig_send = nxscope._comm.send_user_frame
+
+        def fake_send(fid, payload, ack_mode="auto", ack_timeout=1.0):
+            req = nxscope._ext_decode(fid, payload)
+            assert req is not None
+            assert req.flags & 0x01
+            resp_payload = nxscope._ext_encode(
+                ext_id=req.ext_id,
+                cmd_id=req.cmd_id,
+                flags=0x02,
+                req_id=req.req_id,
+                status=0,
+                payload=b"ok-data",
+            )
+            nxscope._ext_dispatch_frame(
+                DParseFrame(fid=fid, data=resp_payload)
+            )
+            return ParseAck(True, 0)
+
+        nxscope._comm.send_user_frame = fake_send
+        try:
+            ret = nxscope.ext_call(
+                ext_id=4,
+                cmd_id=1,
+                payload=b"a",
+                ack_mode="disabled",
+                timeout=0.2,
+            )
+        finally:
+            nxscope._comm.send_user_frame = orig_send
+
+        assert ret == b"ok-data"
+
+
+def test_nxscope_ext_call_decode():
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
+
+    with nxscope:
+        orig_send = nxscope._comm.send_user_frame
+
+        def fake_send(fid, payload, ack_mode="auto", ack_timeout=1.0):
+            req = nxscope._ext_decode(fid, payload)
+            assert req is not None
+            assert req.flags & 0x01
+            resp_payload = nxscope._ext_encode(
+                ext_id=req.ext_id,
+                cmd_id=req.cmd_id,
+                flags=0x02,
+                req_id=req.req_id,
+                status=0,
+                payload=b"\x2a\x00",
+            )
+            nxscope._ext_dispatch_frame(
+                DParseFrame(fid=fid, data=resp_payload)
+            )
+            return ParseAck(True, 0)
+
+        nxscope._comm.send_user_frame = fake_send
+        try:
+            ret = nxscope.ext_call_decode(
+                ext_id=4,
+                cmd_id=2,
+                payload=b"a",
+                decode=lambda data: int.from_bytes(data, "little"),
+                ack_mode="disabled",
+                timeout=0.2,
+            )
+        finally:
+            nxscope._comm.send_user_frame = orig_send
+
+        assert ret == 42
+
+
+def test_nxscope_ext_call_raises_on_error_status():
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
+
+    with nxscope:
+        orig_send = nxscope._comm.send_user_frame
+
+        def fake_send(fid, payload, ack_mode="auto", ack_timeout=1.0):
+            req = nxscope._ext_decode(fid, payload)
+            assert req is not None
+            assert req.flags & 0x01
+            resp_payload = nxscope._ext_encode(
+                ext_id=req.ext_id,
+                cmd_id=req.cmd_id,
+                flags=0x04,
+                req_id=req.req_id,
+                status=7,
+                payload=b"bad",
+            )
+            nxscope._ext_dispatch_frame(
+                DParseFrame(fid=fid, data=resp_payload)
+            )
+            return ParseAck(True, 0)
+
+        nxscope._comm.send_user_frame = fake_send
+        try:
+            with pytest.raises(DExtCallError) as exc:
+                nxscope.ext_call(
+                    ext_id=4,
+                    cmd_id=3,
+                    payload=b"a",
+                    ack_mode="disabled",
+                    timeout=0.2,
+                )
+        finally:
+            nxscope._comm.send_user_frame = orig_send
+
+        assert exc.value.response.status == 7
+        assert exc.value.response.payload == b"bad"
+        assert exc.value.response.is_error is True
+
+
+def test_nxscope_ext_bind_handles_request_and_notify():
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
+
+    with nxscope:
+        got = []
+        sent = []
+        orig_send = nxscope._comm.send_user_frame
+
+        def fake_send(fid, payload, ack_mode="auto", ack_timeout=1.0):
+            sent.append((fid, payload, ack_mode, ack_timeout))
+            return ParseAck(True, 0)
+
+        nxscope._comm.send_user_frame = fake_send  # type: ignore[attr-defined]
+        try:
+
+            def handler(req):
+                got.append((req.ext_id, req.cmd_id, req.payload, req.flags))
+                return (5, b"bad")
+
+            nxscope.ext_bind(11, handler)
+
+            req_payload = nxscope._ext_encode(
+                ext_id=11,
+                cmd_id=2,
+                flags=0x01,
+                req_id=42,
+                status=0,
+                payload=b"abc",
+            )
+            handled = nxscope._ext_dispatch_frame(
+                DParseFrame(fid=8, data=req_payload)
+            )
+            assert handled is True
+            assert got == [(11, 2, b"abc", 0x01)]
+            assert len(sent) == 1
+            decoded = nxscope._ext_decode(sent[0][0], sent[0][1])
+            assert decoded is not None
+            assert decoded.flags == 0x04
+            assert decoded.req_id == 42
+            assert decoded.status == 5
+            assert decoded.payload == b"bad"
+
+            got.clear()
+            note_payload = nxscope._ext_encode(
+                ext_id=11,
+                cmd_id=3,
+                flags=0x08,
+                req_id=0,
+                status=0,
+                payload=b"note",
+            )
+            handled = nxscope._ext_dispatch_frame(
+                DParseFrame(fid=8, data=note_payload)
+            )
+            assert handled is True
+            assert got == [(11, 3, b"note", 0x08)]
+            assert len(sent) == 1
+            assert nxscope.ext_unbind(11) is True
+            assert nxscope.ext_unbind(11) is False
+        finally:
+            nxscope._comm.send_user_frame = orig_send
+
+
+def test_nxscope_plugin_register_receives_control_surface():
+    class ControlPlugin(INxscopePlugin):
+        name = "ctl"
+
+        def __init__(self):
+            self.control = None
+
+        def on_register(self, control):
+            self.control = control
+
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
+    plugin = ControlPlugin()
+    nxscope.register_plugin(plugin)
+    assert plugin.control is not None
+    assert plugin.control is not nxscope
+    assert hasattr(plugin.control, "ext_request")
+    assert hasattr(plugin.control, "ext_call")
+    assert hasattr(plugin.control, "ext_call_decode")
+    assert nxscope.unregister_plugin("ctl") is True
+
+
+def test_nxscope_plugin_control_forwards_all_extension_methods():
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
+    control = nxscope._control
+    calls = []
+
+    nxscope.send_user_frame = lambda **kw: calls.append(
+        ("send_user_frame", kw)
+    ) or ParseAck(True, 0)
+    nxscope.add_user_frame_listener = (
+        lambda cb, fids=None: calls.append(
+            ("add_user_frame_listener", cb, fids)
+        )
+        or 11
+    )
+    nxscope.remove_user_frame_listener = (
+        lambda lid: calls.append(("remove_user_frame_listener", lid)) or True
+    )
+    nxscope.ext_channel_add = lambda chan: calls.append(
+        ("ext_channel_add", chan)
+    )
+    nxscope.ext_publish_numpy = lambda chan, data: calls.append(
+        ("ext_publish_numpy", chan, data)
+    )
+    nxscope.ext_publish_legacy = lambda chan, data: calls.append(
+        ("ext_publish_legacy", chan, data)
+    )
+    nxscope.ext_bind = lambda ext_id, h: calls.append(("ext_bind", ext_id, h))
+    nxscope.ext_unbind = (
+        lambda ext_id: calls.append(("ext_unbind", ext_id)) or True
+    )
+    nxscope.ext_notify = lambda **kw: calls.append(
+        ("ext_notify", kw)
+    ) or ParseAck(True, 0)
+    nxscope.ext_request = lambda **kw: calls.append(
+        ("ext_request", kw)
+    ) or nxscope._ext_decode(8, nxscope._ext_encode(1, 2, 0x02, 1, 0, b""))
+    nxscope.ext_call = lambda **kw: calls.append(("ext_call", kw)) or b"ok"
+    nxscope.ext_call_decode = (
+        lambda **kw: calls.append(("ext_call_decode", kw)) or 42
+    )
+
+    assert control.send_user_frame(8, b"x").state is True
+    assert control.add_user_frame_listener(lambda _: False, [8]) == 11
+    assert control.remove_user_frame_listener(11) is True
+    control.ext_channel_add(101)
+    control.ext_publish_numpy(101, [])
+    control.ext_publish_legacy(101, [])
+    control.ext_bind(2, lambda _: None)
+    assert control.ext_unbind(2) is True
+    assert control.ext_notify(2, 1, b"x").state is True
+    assert control.ext_request(2, 1, b"x") is not None
+    assert control.ext_call(2, 1, b"x") == b"ok"
+    assert control.ext_call_decode(2, 1, b"x", decode=lambda data: data) == 42
+
+    names = [entry[0] for entry in calls]
+    assert "send_user_frame" in names
+    assert "add_user_frame_listener" in names
+    assert "remove_user_frame_listener" in names
+    assert "ext_channel_add" in names
+    assert "ext_publish_numpy" in names
+    assert "ext_publish_legacy" in names
+    assert "ext_bind" in names
+    assert "ext_unbind" in names
+    assert "ext_notify" in names
+    assert "ext_request" in names
+    assert "ext_call" in names
+    assert "ext_call_decode" in names
+
+
+def test_nxscope_extension_validation_and_edge_paths():
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
+
+    with pytest.raises(ValueError):
+        nxscope._ext_encode(-1, 1, 0, 1, 0, b"x")
+    with pytest.raises(ValueError):
+        nxscope._ext_encode(1, 256, 0, 1, 0, b"x")
+    with pytest.raises(ValueError):
+        nxscope._ext_encode(1, 1, 0, -1, 0, b"x")
+    with pytest.raises(ValueError):
+        nxscope._ext_encode(1, 1, 0, 1, 256, b"x")
+    with pytest.raises(TypeError):
+        nxscope._ext_encode(1, 1, 0, 1, 0, "x")  # type: ignore[arg-type]
+    with pytest.raises(ValueError):
+        nxscope.ext_bind(-1, lambda _: None)
+    with pytest.raises(TypeError):
+        nxscope.ext_bind(1, 123)  # type: ignore[arg-type]
+
+    bad_magic = b"\x00" + nxscope._ext_encode(1, 1, 0, 1, 0, b"x")[1:]
+    assert nxscope._ext_decode(8, bad_magic) is None
+
+    nxscope._ext_req_id = 0xFFFF
+    req = nxscope._ext_alloc_req_id()
+    assert req == 0xFFFF
+
+    nxscope._ext_req_id = 1
+    nxscope._ext_pending = {
+        i: queue.Queue(maxsize=1) for i in range(1, 0x10000)
+    }
+    with pytest.raises(RuntimeError):
+        nxscope._ext_alloc_req_id()
+
+    nxscope.ext_channel_add(300)
+    nxscope.ext_channel_add(300)
+    q300 = nxscope.stream_sub(300)
+    nxscope.ext_publish_numpy(300, [DNxscopeStreamBlock(np.array([1]), None)])
+    assert q300.get(timeout=0.1)[0].data[0] == 1
+
+    nxscope.ext_channel_add(301)
+    q301 = nxscope.stream_sub(301)
+    nxscope.ext_publish_legacy(301, [DNxscopeStream((1,), (0,))])
+    assert q301.get(timeout=0.1)[0].data == (1,)
+
+    q999 = nxscope.stream_sub(999)
+    nxscope.ext_publish_numpy(1000, [DNxscopeStreamBlock(np.array([2]), None)])
+    nxscope.ext_publish_legacy(1001, [DNxscopeStream((2,), (0,))])
+    nxscope.stream_unsub(q999)
+    nxscope.stream_unsub(queue.Queue())
+
+    with pytest.raises(ValueError):
+        nxscope.ext_channel_add(-1)
+
+
+def test_nxscope_extension_dispatch_misc_branches():
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+    nxscope = NxscopeHandler(
+        intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
+    )
+
+    with nxscope:
+        sent = []
+        orig_send = nxscope._comm.send_user_frame
+
+        def fake_send(fid, payload, ack_mode="auto", ack_timeout=1.0):
+            sent.append((fid, payload, ack_mode, ack_timeout))
+            return ParseAck(True, 0)
+
+        nxscope._comm.send_user_frame = fake_send
+        try:
+            assert nxscope.ext_notify(5, 1, b"x", ack_mode="disabled").state
+            req = nxscope._ext_decode(sent[-1][0], sent[-1][1])
+            assert req is not None
+            assert req.flags == 0x08
+
+            def fail_ack(fid, payload, ack_mode="auto", ack_timeout=1.0):
+                del fid, payload, ack_mode, ack_timeout
+                return ParseAck(False, -5)
+
+            nxscope._comm.send_user_frame = fail_ack
+            with pytest.raises(RuntimeError):
+                nxscope.ext_request(
+                    ext_id=5,
+                    cmd_id=1,
+                    payload=b"x",
+                    ack_mode="required",
+                )
+        finally:
+            nxscope._comm.send_user_frame = orig_send
+
+        resp_no_pending = nxscope._ext_encode(5, 1, 0x02, 1234, 0, b"ok")
+        assert (
+            nxscope._ext_dispatch_frame(
+                DParseFrame(fid=8, data=resp_no_pending)
+            )
+            is False
+        )
+
+        req_no_handler = nxscope._ext_encode(6, 1, 0x01, 11, 0, b"x")
+        assert (
+            nxscope._ext_dispatch_frame(
+                DParseFrame(fid=8, data=req_no_handler)
+            )
+            is False
+        )
+
+        nxscope.ext_bind(7, lambda _: None)
+        req_none = nxscope._ext_encode(7, 1, 0x01, 12, 0, b"x")
+        assert nxscope._ext_dispatch_frame(DParseFrame(fid=8, data=req_none))
+        nxscope.ext_unbind(7)
+
+        sent2 = []
+
+        def collect_send(fid, payload, ack_mode="auto", ack_timeout=1.0):
+            sent2.append((fid, payload, ack_mode, ack_timeout))
+            return ParseAck(True, 0)
+
+        nxscope._comm.send_user_frame = collect_send
+        try:
+            nxscope.ext_bind(8, lambda _: b"done")
+            req_bytes = nxscope._ext_encode(8, 1, 0x01, 13, 0, b"x")
+            assert nxscope._ext_dispatch_frame(
+                DParseFrame(fid=8, data=req_bytes)
+            )
+            out = nxscope._ext_decode(sent2[-1][0], sent2[-1][1])
+            assert out is not None
+            assert out.payload == b"done"
+            assert out.status == 0
+
+            nxscope.ext_unbind(8)
+            nxscope.ext_bind(9, lambda _: 123)
+            req_bad = nxscope._ext_encode(9, 1, 0x01, 14, 0, b"x")
+            with pytest.raises(TypeError):
+                nxscope._ext_dispatch_frame(DParseFrame(fid=8, data=req_bad))
+        finally:
+            nxscope._comm.send_user_frame = orig_send

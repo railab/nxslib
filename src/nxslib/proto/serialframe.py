@@ -84,10 +84,10 @@ class SerialFrame(ICommFrame):
             return DParseHdr(err=EParseError.HDR)
 
         try:
-            fid = EParseId(_id)
+            fid = int(EParseId(_id))
         except ValueError:
-            logger.error("unknown id = %s", hex(_id))
-            return DParseHdr(err=EParseError.HDR)
+            # User-defined IDs are valid extension points.
+            fid = int(_id)
 
         return DParseHdr(fid=fid, flen=flen)
 
@@ -118,7 +118,7 @@ class SerialFrame(ICommFrame):
 
         return DParseFrame(fid=hdr.fid, data=data)
 
-    def frame_create(self, fid: EParseId, data: bytes | None) -> bytes:
+    def frame_create(self, fid: int, data: bytes | None) -> bytes:
         """Create a frame from data.
 
         :param fid: frame ID
