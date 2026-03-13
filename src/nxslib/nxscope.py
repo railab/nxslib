@@ -185,9 +185,14 @@ class NxscopeHandler:
             _BitrateTracker() if enable_bitrate_tracking else None
         )
 
-    def __del__(self) -> None:
-        """Make sure to disconnect from dev."""
-        self.disconnect()  # pragma: no cover
+    def __enter__(self) -> "NxscopeHandler":
+        """Connect on context manager entry."""
+        self.connect()
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        """Disconnect on context manager exit."""
+        self.disconnect()
 
     def _stream_start(self) -> bool:
         """Start stream request."""

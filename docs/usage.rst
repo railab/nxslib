@@ -4,124 +4,96 @@ Usage
 Quick start
 -----------
 
-1. Set up the frame parser:
+The recommended way to manage resources is with the context manager protocol.
+``NxscopeHandler.__enter__`` calls ``connect()`` and ``__exit__`` calls
+``disconnect()``, so cleanup is guaranteed even if an exception occurs.
 
-   .. code-block:: python
+.. code-block:: python
 
-      from nxslib.proto.parse import Parser
-      parse = Parser()
+   from nxslib.proto.parse import Parser
+   from nxslib.intf.dummy import DummyDev
+   from nxslib.nxscope import NxscopeHandler
 
-2. Initialize the communication interface.
+   parse = Parser()
+   intf = DummyDev()
 
-   For a quick start, you can use a simulated NxScope device built into the library:
-   
-   .. code-block:: python
+   with NxscopeHandler(intf, parse) as nxscope:
+       print(nxscope.dev)
 
-      from nxslib.intf.dummy import DummyDev
-      intf = DummyDev()
+       # subscribe to channel data streams before starting
+       q0 = nxscope.stream_sub(0)
+       q1 = nxscope.stream_sub(1)
 
+       # configure channels
+       nxscope.channels_default_cfg()
+       nxscope.ch_enable(0)
+       nxscope.ch_enable(1)
 
-   Alternatively, connect to the real NxScope serial device:
+       # configure divider if supported
+       if nxscope.dev.div_supported:
+           nxscope.ch_divider(0, 10)
+           nxscope.ch_divider(1, 20)
 
-   .. code-block:: python
+       # configuration is buffered — write it to the device
+       nxscope.channels_write()
 
-      serial_path = "/dev/ttyACM0"
-      serial_buad = 100000
-      intf = SerialDevice(serial_path, serial_baud)
+       # start stream and read data
+       nxscope.stream_start()
+       data0 = q0.get(block=True, timeout=1)
+       data1 = q1.get(block=True, timeout=1)
+       print(data0)
+       print(data1)
 
-   or device that support NxScope over Segger RTT interface:
+       # stop stream and unsubscribe
+       nxscope.stream_stop()
+       nxscope.stream_unsub(q0)
+       nxscope.stream_unsub(q1)
+   # nxscope.disconnect() is called automatically on context manager exit
 
-   .. code-block:: python
+If you need to manage the connection lifetime manually:
 
-      target_device = "STM32G431CB"
-      buffer_index = 1
-      upsize = 2048
-      intf = RTTDevice(target_device, buffer_index, upsize)
+.. code-block:: python
 
-3. Create a NxScope instance and connect:
+   nxscope = NxscopeHandler(intf, parse)
+   nxscope.connect()
+   try:
+       # ... work here
+   finally:
+       nxscope.disconnect()
 
-   .. code-block:: python
+Interfaces
+----------
 
-      from nxslib.nxscope import NxscopeHandler
+For a quick start, use the simulated NxScope device built into the library:
 
-      nxscope = NxscopeHandler(intf, parse)
-      nxscope.connect()
-      print(nxscope.dev)
+.. code-block:: python
 
+   from nxslib.intf.dummy import DummyDev
+   with DummyDev() as intf:
+       ...
 
-5. Subscribe to the channel data stream:
+Connect to a real NxScope device over a serial port:
 
-   .. code-block:: python
+.. code-block:: python
 
-      q0 = nxscope.stream_sub(0)
-      q1 = nxscope.stream_sub(1)
+   from nxslib.intf.serial import SerialDevice
+   with SerialDevice("/dev/ttyACM0", baud=100000) as intf:
+       ...
 
+Connect to a device that supports NxScope over the Segger RTT interface:
 
-6. Configure channels individually:
+.. code-block:: python
 
-   .. code-block:: python
+   from nxslib.intf.rtt import RTTDevice
+   with RTTDevice("STM32G431CB", buffer_index=1, upsize=2048, interface="swd") as intf:
+       ...
 
-      # default configuration
-      nxscope.channels_default_cfg()
+All interface classes support the context manager protocol:
 
-      # enable channels
-      nxscope.ch_enable(0)
-      nxscope.ch_enable(1)
+.. code-block:: python
 
-      # configure divider if supportd
-      if nxscope.dev.div_supported:
-          nxscope.ch_divider(0, 10)
-          nxscope.ch_divider(1, 20)
-
-   Channels configuration is buffered, so we have to explicitly
-   write it to the device:
-
-   .. code-block:: python
-
-      nxscope.channels_write()
-
-   You can verify channels configuration:
-
-   .. code-block:: python
-
-      print(nxscope.dev_channel_get(0).en)
-      print(nxscope.dev_channel_get(1).en)
-      print(nxscope.dev_channel_get(0).div)
-      print(nxscope.dev_channel_get(1).div)
-
-
-7. Start the data stream and get data from queue:
-
-   .. code-block:: python
-
-      # start stream
-      nxscope.stream_start()
-
-      # get data from channel 0 queue
-      data0 = q0.get(block=True, timeout=1)
-
-      # get data from channel 1 queue
-      data1 = q1.get(block=True, timeout=1)
-
-      print(data0)
-      print(data1)
-
-
-9. We done now, unsubscribe from queues:
-
-   .. code-block:: python
-
-      nxscope.stream_unsub(q0)
-      nxscope.stream_unsub(q1)
-
-
-9. And disconnect from the device:
-
-   .. code-block:: python
-
-      nxscope.disconnect()
-
-   IMPORTANT: this must be done manually ! Garbage collector will not help us.
+   with SerialDevice("/dev/ttyACM0") as intf:
+       ...  # intf.stop() called automatically on exit
 
 Communication handler
 ---------------------
@@ -143,16 +115,6 @@ a class derived from `ICommFrame`:
    parse = Parser(frame=frame)
 
 
-Interfaces
-^^^^^^^^^^^
-
-If your NxScope device support DMA RX, you have to align data sending from client
-interface to the smallest value that will trigger DMA trasfer.
-
-For this purpose there is `intf.write_padding` property that configure data padding
-for `write` method.
-
-
 Dummy device interface
 """"""""""""""""""""""
 
@@ -166,6 +128,12 @@ Just use `DummyDev` class parameters: `chmax`, `flags` and `channels`.
 Serial port interface
 """""""""""""""""""""
 
+If your NxScope device supports DMA RX, you have to align data sending from
+the client interface to the smallest value that will trigger a DMA transfer.
+
+For this purpose there is `intf.write_padding` property that configures data
+padding for the `write` method.
+
 You can use `socat` to connect to a simulated NuttX target:
 
 .. code-block:: bash
@@ -176,7 +144,6 @@ You can use `socat` to connect to a simulated NuttX target:
    # run socat in background
    socat PTY,link=$SERIAL_NUTTX PTY,link=$SERIAL_HOST &
    stty -F $SERIAL_NUTTX raw
-   tty -F $SERIAL_HOST raw
+   stty -F $SERIAL_HOST raw
    stty -F $SERIAL_NUTTX 115200
    stty -F $SERIAL_HOST 115200
-

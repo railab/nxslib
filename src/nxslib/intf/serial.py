@@ -46,10 +46,14 @@ class SerialDevice(ICommInterface):
 
         super().__init__()
 
-    def __del__(self) -> None:
-        """Make sure that serial port is closed."""
-        if self._ser:
-            self._ser.close()
+    def __enter__(self) -> "SerialDevice":
+        """Start on context manager entry."""
+        self.start()
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        """Stop on context manager exit."""
+        self.stop()
 
     def start(self) -> None:
         """Start the interface."""
@@ -58,6 +62,8 @@ class SerialDevice(ICommInterface):
     def stop(self) -> None:
         """Stop the interface."""
         logger.debug("Stop serial interface")
+        if self._ser:
+            self._ser.close()
 
     def drop_all(self) -> None:
         """Drop all frames."""
