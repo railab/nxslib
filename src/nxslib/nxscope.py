@@ -5,7 +5,7 @@ from collections import deque
 from dataclasses import dataclass
 from threading import Lock
 from time import time
-from typing import TYPE_CHECKING, Any, Deque, Tuple
+from typing import TYPE_CHECKING, Any
 
 from nxslib.comm import CommHandler
 from nxslib.logger import logger
@@ -98,7 +98,7 @@ class _BitrateTracker:
         """
         self.bytes_received: int = 0
         self.last_timestamp: float = 0.0
-        self.samples: Deque[Tuple[float, int]] = deque()
+        self.samples: deque[tuple[float, int]] = deque()
         self.window_seconds: float = window_seconds
         self._lock = Lock()
 
