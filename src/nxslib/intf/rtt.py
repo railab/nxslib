@@ -107,6 +107,15 @@ class RTTDevice(ICommInterface):  # pragma: no cover
 
         return False
 
+    def __enter__(self) -> "RTTDevice":
+        """Start on context manager entry."""
+        self.start()
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        """Stop on context manager exit."""
+        self.stop()
+
     def start(self) -> None:
         """Start the interface."""
         logger.debug("start RTT interface")

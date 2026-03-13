@@ -19,7 +19,9 @@ def test_nxslib_init():
 def comm():
     i = DummyDev(thread_timeout=0.05)
     p = Parser()
-    return CommHandler(i, p, drop_timeout=0.01, stream_data_timeout=0.05)
+    c = CommHandler(i, p, drop_timeout=0.01, stream_data_timeout=0.05)
+    yield c
+    c.disconnect()
 
 
 def test_nxslib_connect(comm):
@@ -48,365 +50,335 @@ def test_nxslib_channels(comm):
     with pytest.raises(AssertionError):
         comm.channels_default_cfg()
 
-    # connect
-    comm.connect()
+    with comm:
+        # default configuration
+        comm.channels_default_cfg()
+        comm.channels_write()
+        for chan in range(comm.dev.data.chmax):
+            assert comm.ch_is_enabled(chan) is False
+            assert comm.ch_div_get(chan) == 0
 
-    # default configuration
-    comm.channels_default_cfg()
-    comm.channels_write()
-    for chan in range(comm.dev.data.chmax):
-        assert comm.ch_is_enabled(chan) is False
-        assert comm.ch_div_get(chan) == 0
+        # invalid interface use
+        with pytest.raises(TypeError):
+            comm.ch_enable("1")
+        with pytest.raises(TypeError):
+            comm.ch_disable("1")
+        with pytest.raises(TypeError):
+            comm.ch_divider("1", 0)
+        with pytest.raises(ValueError):
+            comm.ch_divider(1, 1000)
 
-    # invalid interface use
-    with pytest.raises(TypeError):
-        comm.ch_enable("1")
-    with pytest.raises(TypeError):
-        comm.ch_disable("1")
-    with pytest.raises(TypeError):
-        comm.ch_divider("1", 0)
-    with pytest.raises(ValueError):
-        comm.ch_divider(1, 1000)
+        # enable all channels
+        comm.ch_enable_all()
+        comm.channels_write()
+        for chan in range(comm.dev.data.chmax):
+            assert comm.ch_is_enabled(chan) is True
+            assert comm.ch_div_get(chan) == 0
 
-    # enable all channels
-    comm.ch_enable_all()
-    comm.channels_write()
-    for chan in range(comm.dev.data.chmax):
-        assert comm.ch_is_enabled(chan) is True
-        assert comm.ch_div_get(chan) == 0
+        # enable all once again
+        comm.ch_enable_all()
+        comm.channels_write()
 
-    # enable all once again
-    comm.ch_enable_all()
-    comm.channels_write()
+        # disable channel
+        comm.ch_disable(0)
+        comm.channels_write()
+        assert comm.ch_is_enabled(0) is False
+        assert comm.ch_is_enabled(1) is True
+        assert comm.ch_is_enabled(2) is True
+        assert comm.ch_is_enabled(3) is True
 
-    # disable channel
-    comm.ch_disable(0)
-    comm.channels_write()
-    assert comm.ch_is_enabled(0) is False
-    assert comm.ch_is_enabled(1) is True
-    assert comm.ch_is_enabled(2) is True
-    assert comm.ch_is_enabled(3) is True
+        # disable channels
+        comm.ch_disable([1, 3])
+        comm.channels_write()
 
-    # disable channels
-    comm.ch_disable([1, 3])
-    comm.channels_write()
+        # once again
+        comm.ch_disable([1, 3])
+        comm.channels_write()
 
-    # once again
-    comm.ch_disable([1, 3])
-    comm.channels_write()
+        # divider
+        comm.ch_divider(1, 1)
+        comm.channels_write()
+        assert comm.ch_div_get(0) == 0
+        assert comm.ch_div_get(1) == 1
+        assert comm.ch_div_get(2) == 0
+        assert comm.ch_div_get(3) == 0
 
-    # divider
-    comm.ch_divider(1, 1)
-    comm.channels_write()
-    assert comm.ch_div_get(0) == 0
-    assert comm.ch_div_get(1) == 1
-    assert comm.ch_div_get(2) == 0
-    assert comm.ch_div_get(3) == 0
-
-    # divider
-    comm.ch_divider([0, 3], 3)
-    comm.channels_write()
-    assert comm.ch_div_get(0) == 3
-    assert comm.ch_div_get(1) == 1
-    assert comm.ch_div_get(2) == 0
-    assert comm.ch_div_get(3) == 3
-    # disconnect
-    comm.disconnect()
+        # divider
+        comm.ch_divider([0, 3], 3)
+        comm.channels_write()
+        assert comm.ch_div_get(0) == 3
+        assert comm.ch_div_get(1) == 1
+        assert comm.ch_div_get(2) == 0
+        assert comm.ch_div_get(3) == 3
 
 
 def test_nxslib_stream_ch1(comm):
-    # connect
-    comm.connect()
+    with comm:
+        # default configuration
+        comm.channels_default_cfg()
 
-    # default configuration
-    comm.channels_default_cfg()
+        # enable channel 1
+        comm.ch_enable(1)
+        comm.channels_write()
 
-    # enable channel 1
-    comm.ch_enable(1)
-    comm.channels_write()
+        # no stream - should be no data
+        assert comm.stream_data() is None
 
-    # no stream - should be no data
-    assert comm.stream_data() is None
+        # start stream
+        comm.stream_start()
 
-    # start stream
-    comm.stream_start()
+        # get data
+        data = comm.stream_data()
+        assert data is not None
+        assert data.flags == 0
 
-    # get data
-    data = comm.stream_data()
-    assert data is not None
-    assert data.flags == 0
+        # should mach dummy dev channel 1
+        i = 1.0
+        for x in data.samples:
+            assert x.chan == 1
+            assert x.dtype == EParseDataType.NUM
+            assert x.vdim == 1
+            assert x.mlen == 0
+            assert isinstance(x.data, tuple)
+            assert x.data == (i,)
+            i += 1.0
+            assert x.meta == ()
 
-    # should mach dummy dev channel 1
-    i = 1.0
-    for x in data.samples:
-        assert x.chan == 1
-        assert x.dtype == EParseDataType.NUM
-        assert x.vdim == 1
-        assert x.mlen == 0
-        assert isinstance(x.data, tuple)
-        assert x.data == (i,)
-        i += 1.0
-        assert x.meta == ()
-
-    # do not stop stream but disconnect
-    comm.disconnect()
+        # do not stop stream but disconnect
 
 
 def test_nxslib_stream_ch1ch2(comm):
-    # connect
-    comm.connect()
+    with comm:
+        # default configuration
+        comm.channels_default_cfg()
 
-    # default configuration
-    comm.channels_default_cfg()
+        # enable channel 1 and 2
+        comm.ch_enable([1, 2])
+        comm.channels_write()
 
-    # enable channel 1 and 2
-    comm.ch_enable([1, 2])
-    comm.channels_write()
+        # no stream - should be no data
+        assert comm.stream_data() is None
 
-    # no stream - should be no data
-    assert comm.stream_data() is None
+        # start stream
+        comm.stream_start()
 
-    # start stream
-    comm.stream_start()
+        # get data
+        data = comm.stream_data()
+        assert data is not None
+        assert data.flags == 0
 
-    # get data
-    data = comm.stream_data()
-    assert data is not None
-    assert data.flags == 0
+        # we expect data from ch1 and ch2
+        ch1_cntr = 0
+        ch2_cntr = 0
+        for x in data.samples:
+            if x.chan == 1:
+                ch1_cntr += 1
+            if x.chan == 2:
+                ch2_cntr += 1
 
-    # we expect data from ch1 and ch2
-    ch1_cntr = 0
-    ch2_cntr = 0
-    for x in data.samples:
-        if x.chan == 1:
-            ch1_cntr += 1
-        if x.chan == 2:
-            ch2_cntr += 1
+        assert ch1_cntr > 0
+        assert ch2_cntr > 0
 
-    assert ch1_cntr > 0
-    assert ch2_cntr > 0
-
-    # do not stop stream but disconnect
-    comm.disconnect()
+        # do not stop stream but disconnect
 
 
 def test_nxslib_stream_ch6(comm):
-    # connect again
-    comm.connect()
+    with comm:
+        # default configuration
+        comm.channels_default_cfg()
 
-    # default configuration
-    comm.channels_default_cfg()
+        # enable channel 6
+        comm.ch_enable(6)
+        comm.channels_write()
 
-    # enable channel 6
-    comm.ch_enable(6)
-    comm.channels_write()
+        # no stream - should be no data
+        assert comm.stream_data() is None
 
-    # no stream - should be no data
-    assert comm.stream_data() is None
+        # start stream
+        comm.stream_start()
 
-    # start stream
-    comm.stream_start()
+        # get data
+        data = comm.stream_data()
+        assert data is not None
+        assert data.flags == 0
 
-    # get data
-    data = comm.stream_data()
-    assert data is not None
-    assert data.flags == 0
+        # should mach dummy dev channel 6 - we should capture at
+        # least one message
+        for x in data.samples:
+            assert x.chan == 6
+            assert x.dtype == EParseDataType.CHAR
+            assert x.vdim == 64
+            assert x.mlen == 0
+            assert isinstance(x.data[0], str)
+            assert x.data == ("hello" + "\0" * 59,)
+            assert x.meta == ()
 
-    # should mach dummy dev channel 6 - we should capture at least one message
-    for x in data.samples:
-        assert x.chan == 6
-        assert x.dtype == EParseDataType.CHAR
-        assert x.vdim == 64
-        assert x.mlen == 0
-        assert isinstance(x.data[0], str)
-        assert x.data == ("hello" + "\0" * 59,)
-        assert x.meta == ()
-
-    # stop stream
-    comm.stream_stop()
-
-    # disconnect
-    comm.disconnect()
+        # stop stream
+        comm.stream_stop()
 
 
 def test_nxslib_stream_ch7(comm):
-    # connect again
-    comm.connect()
+    with comm:
+        # default configuration
+        comm.channels_default_cfg()
 
-    # default configuration
-    comm.channels_default_cfg()
+        # enable channel 7
+        comm.ch_enable(7)
+        comm.channels_write()
 
-    # enable channel 7
-    comm.ch_enable(7)
-    comm.channels_write()
+        # no stream - should be no data
+        assert comm.stream_data() is None
 
-    # no stream - should be no data
-    assert comm.stream_data() is None
+        # start stream
+        comm.stream_start()
 
-    # start stream
-    comm.stream_start()
+        # get data
+        data = comm.stream_data()
+        assert data is not None
+        assert data.flags == 0
 
-    # get data
-    data = comm.stream_data()
-    assert data is not None
-    assert data.flags == 0
+        # should mach dummy dev channel 7
+        i = 1
+        for x in data.samples:
+            assert x.chan == 7
+            assert x.dtype == EParseDataType.NUM
+            assert x.vdim == 3
+            assert x.mlen == 1
+            assert isinstance(x.data, tuple)
+            assert x.data == (1, 0, -1)
+            assert x.meta == (i,)
+            i += 1
 
-    # should mach dummy dev channel 7
-    i = 1
-    for x in data.samples:
-        assert x.chan == 7
-        assert x.dtype == EParseDataType.NUM
-        assert x.vdim == 3
-        assert x.mlen == 1
-        assert isinstance(x.data, tuple)
-        assert x.data == (1, 0, -1)
-        assert x.meta == (i,)
-        i += 1
-
-    # stop stream
-    comm.stream_stop()
-
-    # disconnect
-    comm.disconnect()
+        # stop stream
+        comm.stream_stop()
 
 
 def test_nxslib_stream_ch8(comm):
-    # connect again
-    comm.connect()
+    with comm:
+        # default configuration
+        comm.channels_default_cfg()
 
-    # default configuration
-    comm.channels_default_cfg()
+        # enable channel 8
+        comm.ch_enable(8)
+        comm.channels_write()
 
-    # enable channel 8
-    comm.ch_enable(8)
-    comm.channels_write()
+        # no stream - should be no data
+        assert comm.stream_data() is None
 
-    # no stream - should be no data
-    assert comm.stream_data() is None
+        # start stream
+        comm.stream_start()
 
-    # start stream
-    comm.stream_start()
+        # get data
+        data = comm.stream_data()
+        assert data is not None
+        assert data.flags == 0
 
-    # get data
-    data = comm.stream_data()
-    assert data is not None
-    assert data.flags == 0
+        # should mach dummy dev channel 8
+        for x in data.samples:
+            assert x.chan == 8
+            assert x.dtype == EParseDataType.NONE
+            assert x.vdim == 0
+            assert x.mlen == 16
+            assert x.data == ()
+            assert x.meta == (
+                104,
+                101,
+                108,
+                108,
+                111,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+            )  # hello
 
-    # should mach dummy dev channel 7
-    for x in data.samples:
-        assert x.chan == 8
-        assert x.dtype == EParseDataType.NONE
-        assert x.vdim == 0
-        assert x.mlen == 16
-        assert x.data == ()
-        assert x.meta == (
-            104,
-            101,
-            108,
-            108,
-            111,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-        )  # hello
-
-    # stop stream
-    comm.stream_stop()
-
-    # disconnect
-    comm.disconnect()
+        # stop stream
+        comm.stream_stop()
 
 
-def test_nxslib_nodiv(comm):
+def test_nxslib_nodiv():
     i = DummyDev(flags=EDeviceFlags.ACK_SUPPORT.value, thread_timeout=0.05)
     p = Parser()
-    comm = CommHandler(i, p, drop_timeout=0.01, stream_data_timeout=0.05)
+    with CommHandler(
+        i, p, drop_timeout=0.01, stream_data_timeout=0.05
+    ) as comm:
+        # default configuration
+        comm.channels_default_cfg()
+        comm.channels_write()
 
-    # connect
-    comm.connect()
-
-    # default configuration
-    comm.channels_default_cfg()
-    comm.channels_write()
-
-    comm.ch_enable(0)
-    comm.ch_divider(1, 1)
-    comm.channels_write()
-    assert comm.ch_is_enabled(0) is True
-    assert comm.ch_div_get(0) == 0
-
-    # disconnect
-    comm.disconnect()
+        comm.ch_enable(0)
+        comm.ch_divider(1, 1)
+        comm.channels_write()
+        assert comm.ch_is_enabled(0) is True
+        assert comm.ch_div_get(0) == 0
 
 
-def test_nxslib_noack(comm):
+def test_nxslib_noack():
     i = DummyDev(flags=EDeviceFlags.DIVIDER_SUPPORT.value, thread_timeout=0.05)
     p = Parser()
-    comm = CommHandler(i, p, drop_timeout=0.01, stream_data_timeout=0.05)
+    with CommHandler(
+        i, p, drop_timeout=0.01, stream_data_timeout=0.05
+    ) as comm:
+        # default configuration
+        comm.channels_default_cfg()
+        comm.channels_write()
 
-    # connect
-    comm.connect()
-
-    # default configuration
-    comm.channels_default_cfg()
-    comm.channels_write()
-
-    comm.ch_enable(0)
-    comm.ch_divider(1, 1)
-    comm.channels_write()
-    assert comm.ch_is_enabled(0) is True
-    assert comm.ch_div_get(0) == 0
-
-    # disconnect
-    comm.disconnect()
+        comm.ch_enable(0)
+        comm.ch_divider(1, 1)
+        comm.channels_write()
+        assert comm.ch_is_enabled(0) is True
+        assert comm.ch_div_get(0) == 0
 
 
 def test_comm_get_enabled_channels():
     """Test get_enabled_channels method."""
     i = DummyDev(thread_timeout=0.05)
     p = Parser()
-    comm = CommHandler(i, p, drop_timeout=0.01, stream_data_timeout=0.05)
+    with CommHandler(
+        i, p, drop_timeout=0.01, stream_data_timeout=0.05
+    ) as comm:
+        # default configuration - no channels enabled
+        comm.channels_default_cfg()
+        comm.channels_write()
 
-    # connect
-    comm.connect()
+        enabled = comm.get_enabled_channels()
+        assert enabled == ()
 
-    # default configuration - no channels enabled
-    comm.channels_default_cfg()
-    comm.channels_write()
+        # configure buffered-only state (not written yet)
+        comm.ch_enable(1)
+        comm.ch_divider(1, 7)
+        assert comm.get_enabled_channels(applied=True) == ()
+        assert 1 in comm.get_enabled_channels(applied=False)
+        assert comm.ch_div_get(1, applied=True) == 0
+        assert comm.ch_div_get(1, applied=False) == 7
 
-    enabled = comm.get_enabled_channels()
-    assert enabled == ()
+        # enable some channels
+        comm.ch_enable(0)
+        comm.ch_enable(2)
+        comm.ch_enable(4)
+        comm.channels_write()
 
-    # configure buffered-only state (not written yet)
-    comm.ch_enable(1)
-    comm.ch_divider(1, 7)
-    assert comm.get_enabled_channels(applied=True) == ()
-    assert 1 in comm.get_enabled_channels(applied=False)
-    assert comm.ch_div_get(1, applied=True) == 0
-    assert comm.ch_div_get(1, applied=False) == 7
+        enabled = comm.get_enabled_channels()
+        assert 0 in enabled
+        assert 1 in enabled
+        assert 2 in enabled
+        assert 4 in enabled
+        assert 3 not in enabled
+        dividers = comm.get_channel_dividers()
+        assert dividers[1] == 7
 
-    # enable some channels
-    comm.ch_enable(0)
-    comm.ch_enable(2)
-    comm.ch_enable(4)
-    comm.channels_write()
 
-    enabled = comm.get_enabled_channels()
-    assert 0 in enabled
-    assert 1 in enabled
-    assert 2 in enabled
-    assert 4 in enabled
-    assert 3 not in enabled
-    dividers = comm.get_channel_dividers()
-    assert dividers[1] == 7
-
-    # disconnect
-    comm.disconnect()
+def test_comm_context_manager():
+    i = DummyDev(thread_timeout=0.05)
+    p = Parser()
+    with CommHandler(
+        i, p, drop_timeout=0.01, stream_data_timeout=0.05
+    ) as comm:
+        assert comm.dev is not None
