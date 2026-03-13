@@ -196,6 +196,37 @@ def test_nxscope_stream_numpy_bitrate_updates_without_enabled_channels():
         assert stats.bitrate > 0.0
 
 
+def test_nxscope_stream_legacy_mode_is_deprecated_and_functional():
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+    with pytest.warns(DeprecationWarning):
+        nxscope = NxscopeHandler(
+            intf,
+            parse,
+            enable_bitrate_tracking=True,
+            stream_decode_mode="legacy",
+            drop_timeout=0.01,
+            stream_data_timeout=0.05,
+        )
+
+    with nxscope:
+        q0 = nxscope.stream_sub(0)
+        nxscope.channels_default_cfg(writenow=True)
+        nxscope.ch_enable([0], writenow=True)
+        nxscope.stream_start()
+
+        payload = q0.get(block=True, timeout=0.5)
+        assert payload
+        assert isinstance(payload[0], DNxscopeStream)
+        time.sleep(0.2)
+
+        nxscope.stream_stop()
+        nxscope.stream_unsub(q0)
+
+        stats = nxscope.get_stream_stats()
+        assert stats.bitrate > 0.0
+
+
 def test_nxscope_channels_runtime():
     intf = DummyDev(thread_timeout=0.05)
     parse = Parser()

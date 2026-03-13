@@ -50,6 +50,23 @@ The recommended way to manage resources is with the context manager protocol.
        nxscope.stream_unsub(q1)
    # nxscope.disconnect() is called automatically on context manager exit
 
+Stream decode mode
+------------------
+
+``NxscopeHandler`` now decodes stream frames in NumPy block mode by default.
+This is the recommended mode for performance-sensitive pipelines.
+
+If you need compatibility with older per-sample consumers, you can still opt
+in to legacy decode mode explicitly:
+
+.. code-block:: python
+
+   with NxscopeHandler(intf, parse, stream_decode_mode="legacy") as nxscope:
+       ...
+
+Legacy mode is deprecated, should not be used for new code, and will be
+removed in a future release.
+
 If you need to manage the connection lifetime manually:
 
 .. code-block:: python
