@@ -3,11 +3,15 @@
 import struct
 from typing import Any
 
+import numpy as np
+
 from nxslib.dev import Device, DeviceChannel
 from nxslib.proto.iframe import DParseFrame, EParseId, ICommFrame
 from nxslib.proto.iparse import (
     DParseStream,
+    DParseStreamBlock,
     DParseStreamData,
+    DParseStreamNumpy,
     DsfmtItem,
     EParseDataType,
     EParseIdSetFlags,
@@ -26,6 +30,19 @@ from nxslib.proto.serialframe import SerialFrame
 
 class Parser(ICommParse):
     """A class used to a represent NxScope parser."""
+
+    _NUMPY_DTYPE_MAP: dict[str, np.dtype[Any]] = {
+        "B": np.dtype(np.uint8),
+        "b": np.dtype(np.int8),
+        "H": np.dtype("<u2"),
+        "h": np.dtype("<i2"),
+        "I": np.dtype("<u4"),
+        "i": np.dtype("<i4"),
+        "Q": np.dtype("<u8"),
+        "q": np.dtype("<i8"),
+        "f": np.dtype("<f4"),
+        "d": np.dtype("<f8"),
+    }
 
     def __init__(
         self,
@@ -222,6 +239,152 @@ class Parser(ICommParse):
 
         # return samples data and flags (always first byte in stream data)
         return DParseStream(flags=frame.data[0], samples=samples)
+
+    def frame_stream_decode_numpy(  # noqa: C901
+        self, frame: DParseFrame, dev: Device
+    ) -> DParseStreamNumpy | None:
+        """Decode a stream frame into NumPy per-channel blocks."""
+        if frame is None:
+            return None
+        if frame.fid != EParseId.STREAM:
+            return None
+        if not frame.data:
+            return None
+
+        data_mv = memoryview(frame.data)
+        chan_count: dict[int, int] = {}
+        chan_info: dict[int, tuple[DsfmtItem, int, int]] = {}
+
+        # Pass 1: count samples per channel.
+        i = 1
+        while i < len(data_mv):
+            chanid = data_mv[i]
+            chan = dev.channel_get(chanid)
+            assert chan
+            i += 1
+
+            if chanid not in chan_info:
+                decode = dsfmt_get(chan.data.dtype, self._user_types)
+                chan_info[chanid] = (decode, chan.data.vdim, chan.data.mlen)
+            decode, vdim, mlen = chan_info[chanid]
+
+            i += decode.slen * vdim + mlen
+            chan_count[chanid] = chan_count.get(chanid, 0) + 1
+
+        # Allocate output blocks per channel.
+        data_out: dict[int, np.ndarray[Any, Any]] = {}
+        meta_out: dict[int, np.ndarray[Any, Any] | None] = {}
+        write_idx: dict[int, int] = {}
+        for chanid, nsamples in chan_count.items():
+            decode, vdim, mlen = chan_info[chanid]
+            if (
+                decode.dtype == EParseDataType.NUM
+                and not decode.user
+                and decode.dsfmt in self._NUMPY_DTYPE_MAP
+            ):
+                dtype = self._NUMPY_DTYPE_MAP[decode.dsfmt]
+                if decode.scale and decode.scale != 1:
+                    dtype = np.dtype(np.float64)
+                data_out[chanid] = np.empty((nsamples, vdim), dtype=dtype)
+            else:
+                data_out[chanid] = np.empty((nsamples, vdim), dtype=np.object_)
+
+            if mlen == 0:
+                meta_out[chanid] = None
+            elif mlen in (1, 2, 4, 8):
+                mdtype = {
+                    1: np.uint8,
+                    2: np.uint16,
+                    4: np.uint32,
+                    8: np.uint64,
+                }
+                meta_out[chanid] = np.empty((nsamples, 1), dtype=mdtype[mlen])
+            else:
+                meta_out[chanid] = np.empty((nsamples, mlen), dtype=np.uint8)
+
+            write_idx[chanid] = 0
+
+        # Pass 2: decode and fill.
+        i = 1
+        while i < len(data_mv):
+            chanid = data_mv[i]
+            i += 1
+            decode, vdim, mlen = chan_info[chanid]
+            row = write_idx[chanid]
+
+            data_bytes = decode.slen * vdim
+            data_start = i
+            raw_data = data_mv[i : i + data_bytes]
+            i += data_bytes
+
+            if (
+                decode.dtype == EParseDataType.NUM
+                and not decode.user
+                and decode.dsfmt in self._NUMPY_DTYPE_MAP
+            ):
+                np_dtype = self._NUMPY_DTYPE_MAP[decode.dsfmt]
+                sample = np.frombuffer(
+                    frame.data, dtype=np_dtype, count=vdim, offset=data_start
+                )
+                if decode.scale and decode.scale != 1:
+                    data_out[chanid][row, :] = sample / decode.scale
+                else:
+                    data_out[chanid][row, :] = sample
+            else:
+                sfmt = "<"
+                if vdim and not decode.user:
+                    sfmt += str(vdim)
+                sfmt += decode.dsfmt
+                unpacked = struct.unpack(sfmt, raw_data)
+                formatted = self._stream_data_get(decode, unpacked)
+                data_out[chanid][row, :] = np.asarray(
+                    formatted, dtype=np.object_
+                )
+
+            marray = meta_out[chanid]
+            if marray is not None:
+                if mlen in (1, 2, 4, 8):
+                    mdtype = {
+                        1: np.uint8,
+                        2: np.uint16,
+                        4: np.uint32,
+                        8: np.uint64,
+                    }
+                    meta_start = i
+                    marray[row, 0] = np.frombuffer(
+                        frame.data,
+                        dtype=mdtype[mlen],
+                        count=1,
+                        offset=meta_start,
+                    )[0]
+                else:
+                    meta_start = i
+                    marray[row, :] = np.frombuffer(
+                        frame.data,
+                        dtype=np.uint8,
+                        count=mlen,
+                        offset=meta_start,
+                    )
+            i += mlen
+            write_idx[chanid] = row + 1
+
+        blocks: list[DParseStreamBlock] = []
+        for chanid in sorted(chan_count.keys()):
+            decode, vdim, mlen = chan_info[chanid]
+            chan = dev.channel_get(chanid)
+            assert chan
+            blocks.append(
+                DParseStreamBlock(
+                    chan=chan.data.chan,
+                    dtype=int(decode.dtype),
+                    vdim=vdim,
+                    mlen=mlen,
+                    data=data_out[chanid],
+                    meta=meta_out[chanid],
+                )
+            )
+
+        return DParseStreamNumpy(flags=frame.data[0], blocks=blocks)
 
     def frame_cmninfo_decode(self, frame: DParseFrame) -> ParseCmninfo | None:
         """Decode a cmninfo frame."""
