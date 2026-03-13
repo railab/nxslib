@@ -1,7 +1,7 @@
 """Module containing the NxScope handler."""
 
-import os
 import queue
+import warnings
 from collections import deque
 from dataclasses import dataclass
 from threading import Lock
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class DNxscopeStream:
-    """Stream data item."""
+    """Legacy per-sample stream data item (deprecated)."""
 
     data: tuple[Any, ...]
     meta: tuple[Any, ...]
@@ -178,9 +178,8 @@ class NxscopeHandler:
         :param parse: Protocol parser
         :param enable_bitrate_tracking: Enable bitrate tracking
             (default: False)
-        :param stream_decode_mode: stream decode mode: `legacy` or `numpy`.
-            If not provided, uses environment variable
-            `NXSCOPE_STREAM_DECODE_MODE` (default: `legacy`).
+        :param stream_decode_mode: stream decode mode: `numpy` (default)
+            or `legacy` (deprecated).
         :param drop_timeout: timeout used in _drop_all_frames queue drains
         :param stream_data_timeout: timeout used in stream_data() frame wait
         """
@@ -194,12 +193,18 @@ class NxscopeHandler:
 
         self._thrd = ThreadCommon(self._stream_thread, name="stream")
 
-        mode = stream_decode_mode or os.getenv(
-            "NXSCOPE_STREAM_DECODE_MODE", "legacy"
-        )
+        mode = stream_decode_mode or "numpy"
         if mode not in ("legacy", "numpy"):
             raise ValueError("stream_decode_mode must be `legacy` or `numpy`")
         self._stream_decode_mode = mode
+        if self._stream_decode_mode == "legacy":
+            warnings.warn(
+                "legacy stream decode mode is deprecated, should not be used "
+                "for new code, and will be removed in a future release; "
+                "use stream_decode_mode='numpy'",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
         self._sub_q: list[list[queue.Queue[Any]]] = []
         self._queue_lock: Lock = Lock()
