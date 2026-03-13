@@ -6,12 +6,6 @@ from nxslib.dev import (
 from nxslib.intf.dummy import (
     ChannelFunc0,
     ChannelFunc1,
-    ChannelFunc10,
-    ChannelFunc11,
-    ChannelFunc12,
-    ChannelFunc13,
-    ChannelFunc14,
-    ChannelFunc15,
     ChannelFunc2,
     ChannelFunc3,
     ChannelFunc4,
@@ -20,6 +14,12 @@ from nxslib.intf.dummy import (
     ChannelFunc7,
     ChannelFunc8,
     ChannelFunc9,
+    ChannelFunc10,
+    ChannelFunc11,
+    ChannelFunc12,
+    ChannelFunc13,
+    ChannelFunc14,
+    ChannelFunc15,
     DummyDev,
 )
 from nxslib.intf.iintf import ICommInterface

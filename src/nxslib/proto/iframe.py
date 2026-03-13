@@ -52,7 +52,7 @@ class EParseError(IntEnum):
 class DParseHdr:
     """Nxslib frame header data."""
 
-    fid: EParseId = EParseId.UNDEF
+    fid: int = EParseId.UNDEF
     flen: int = 0
     err: EParseError = EParseError.NOERR
 
@@ -66,7 +66,7 @@ class DParseHdr:
 class DParseFrame:
     """Nxslib frame data."""
 
-    fid: EParseId = EParseId.UNDEF
+    fid: int = EParseId.UNDEF
     data: bytes = b""
     err: EParseError = EParseError.NOERR
 
@@ -118,7 +118,7 @@ class ICommFrame(ABC):
         """
 
     @abstractmethod
-    def frame_create(self, fid: EParseId, data: bytes | None) -> bytes:
+    def frame_create(self, fid: int, data: bytes | None) -> bytes:
         """Create a frame from data.
 
         :param fid: frame ID

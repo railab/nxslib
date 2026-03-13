@@ -3,7 +3,8 @@ import pytest  # type: ignore
 from nxslib.comm import CommHandler
 from nxslib.dev import Device, EDeviceFlags
 from nxslib.intf.dummy import DummyDev
-from nxslib.proto.iparse import EParseDataType
+from nxslib.proto.iframe import DParseFrame
+from nxslib.proto.iparse import EParseDataType, ParseAck
 from nxslib.proto.parse import Parser
 
 
@@ -412,3 +413,191 @@ def test_comm_context_manager():
         i, p, drop_timeout=0.01, stream_data_timeout=0.05
     ) as comm:
         assert comm.dev is not None
+
+
+def test_user_listener_dispatch_and_filter():
+    i = DummyDev(thread_timeout=0.05)
+    p = Parser()
+    with CommHandler(
+        i, p, drop_timeout=0.01, stream_data_timeout=0.05
+    ) as comm:
+        seen = []
+
+        def on_user(frame):
+            seen.append((int(frame.fid), frame.data))
+            return True
+
+        lid = comm.add_user_frame_listener(on_user, frame_ids=[8, 9])
+        assert isinstance(lid, int)
+
+        frame_ok = DParseFrame(fid=8, data=b"\x01\x02")
+        frame_ng = DParseFrame(fid=10, data=b"\x03")
+
+        assert comm._dispatch_user_frame(frame_ok) is True
+        assert comm._dispatch_user_frame(frame_ng) is False
+        assert seen == [(8, b"\x01\x02")]
+        assert comm.remove_user_frame_listener(lid) is True
+        assert comm.remove_user_frame_listener(lid) is False
+
+
+def test_send_user_frame_ack_modes():
+    i = DummyDev(thread_timeout=0.05)
+    p = Parser()
+    with CommHandler(
+        i, p, drop_timeout=0.01, stream_data_timeout=0.05
+    ) as comm:
+        # Avoid sending unknown user frames into dummy parser thread.
+        comm._intf.write = lambda _data: None
+
+        calls = []
+        calls_required = []
+
+        def fake_ack(timeout=1.0):
+            calls.append(timeout)
+            return ParseAck(True, 77)
+
+        def fake_ack_req(timeout=1.0):
+            calls_required.append(timeout)
+            return ParseAck(True, 88)
+
+        comm._get_ack = fake_ack
+        comm._get_ack_required = fake_ack_req
+
+        ack = comm.send_user_frame(8, b"\xaa", ack_mode="disabled")
+        assert ack.state is True
+        assert ack.retcode == 0
+        assert calls == []
+        assert calls_required == []
+
+        ack = comm.send_user_frame(
+            9, b"\xbb", ack_mode="auto", ack_timeout=0.2
+        )
+        assert ack.retcode == 77
+        assert calls == [0.2]
+
+        ack = comm.send_user_frame(
+            10, b"\xcc", ack_mode="required", ack_timeout=0.3
+        )
+        assert ack.retcode == 88
+        assert calls_required == [0.3]
+
+        with pytest.raises(ValueError):
+            comm.send_user_frame(7, b"\x00")
+        with pytest.raises(ValueError):
+            comm.send_user_frame(256, b"\x00")
+        with pytest.raises(ValueError):
+            comm.send_user_frame(8, b"\x00", ack_mode="bad")
+
+
+def test_recv_thread_dispatches_user_frames():
+    i = DummyDev(thread_timeout=0.05)
+    p = Parser()
+    with CommHandler(
+        i, p, drop_timeout=0.01, stream_data_timeout=0.05
+    ) as comm:
+        seen = []
+
+        def on_user(frame):
+            seen.append(int(frame.fid))
+            return True
+
+        comm.add_user_frame_listener(on_user)
+        comm._read_frame = lambda: DParseFrame(fid=8, data=b"\x00")
+
+        comm._recv_thread()
+        assert seen == [8]
+        assert comm._get_frame(timeout=0.01) is None
+
+
+def test_user_listener_invalid_range():
+    i = DummyDev(thread_timeout=0.05)
+    p = Parser()
+    with CommHandler(
+        i, p, drop_timeout=0.01, stream_data_timeout=0.05
+    ) as comm:
+        with pytest.raises(ValueError):
+            comm.add_user_frame_listener(lambda _f: True, frame_ids=[7])
+        with pytest.raises(ValueError):
+            comm.add_user_frame_listener(lambda _f: True, frame_ids=[256])
+
+
+def test_dispatch_user_frame_unhandled_goes_to_queue():
+    i = DummyDev(thread_timeout=0.05)
+    p = Parser()
+    with CommHandler(
+        i, p, drop_timeout=0.01, stream_data_timeout=0.05
+    ) as comm:
+        seen = []
+
+        def listener_false(frame):
+            seen.append(("false", int(frame.fid)))
+            return False
+
+        def listener_true(frame):
+            seen.append(("true", int(frame.fid)))
+            return True
+
+        comm.add_user_frame_listener(listener_false, frame_ids=[8])
+        comm.add_user_frame_listener(listener_true, frame_ids=[8])
+
+        frame = DParseFrame(fid=8, data=b"\x00")
+        assert comm._dispatch_user_frame(frame) is True
+        assert seen == [("false", 8), ("true", 8)]
+
+        comm.remove_user_frame_listener(1)
+        assert comm._dispatch_user_frame(frame) is False
+
+        comm._read_frame = lambda: frame
+        comm._recv_thread()
+        queued = comm._get_frame(timeout=0.05)
+        assert queued is not None
+        assert int(queued.fid) == 8
+
+
+def test_get_ack_required_paths():
+    i_noack = DummyDev(
+        flags=EDeviceFlags.DIVIDER_SUPPORT.value, thread_timeout=0.05
+    )
+    p_noack = Parser()
+    with CommHandler(
+        i_noack, p_noack, drop_timeout=0.01, stream_data_timeout=0.05
+    ) as comm_noack:
+        ret = comm_noack._get_ack_required(timeout=0.01)
+        assert ret.state is False
+        assert ret.retcode == -3
+
+    i_ack = DummyDev(
+        flags=(
+            EDeviceFlags.DIVIDER_SUPPORT.value | EDeviceFlags.ACK_SUPPORT.value
+        ),
+        thread_timeout=0.05,
+    )
+    p_ack = Parser()
+    with CommHandler(
+        i_ack, p_ack, drop_timeout=0.01, stream_data_timeout=0.05
+    ) as comm_ack:
+        orig_get_frame = comm_ack._get_frame
+        orig_ack_decode = comm_ack._parse.frame_ack_decode
+        try:
+            comm_ack._get_frame = lambda timeout=1.0: None
+            ret = comm_ack._get_ack_required(timeout=0.01)
+            assert ret.state is False
+            assert ret.retcode == -1
+
+            comm_ack._get_frame = lambda timeout=1.0: DParseFrame(
+                fid=4, data=b"\x00"
+            )
+            comm_ack._parse.frame_ack_decode = lambda _frame: None
+            ret = comm_ack._get_ack_required(timeout=0.01)
+            assert ret.state is False
+            assert ret.retcode == -2
+
+            comm_ack._parse.frame_ack_decode = lambda _frame: ParseAck(
+                True, 123
+            )
+            ret = comm_ack._get_ack_required(timeout=0.01)
+            assert ret.state is True
+            assert ret.retcode == 123
+        finally:
+            comm_ack._get_frame = orig_get_frame
+            comm_ack._parse.frame_ack_decode = orig_ack_decode

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 
 from nxslib.dev import Device, DeviceChannel
 from nxslib.logger import logger
-from nxslib.proto.iframe import DParseFrame, DParseHdr, EParseError
+from nxslib.proto.iframe import DParseFrame, DParseHdr, EParseError, EParseId
 from nxslib.proto.iparse import (
     DParseStream,
     DParseStreamNumpy,
@@ -35,6 +35,14 @@ class DCommChannelsData:
     en_new: list[bool]
     div_now: list[int]
     div_new: list[int]
+
+
+@dataclass
+class DUserFrameListener:
+    """User-frame listener registration."""
+
+    ids: set[int] | None
+    callback: Callable[[DParseFrame], bool | None]
 
 
 ###############################################################################
@@ -78,6 +86,12 @@ class CommHandler:
         # stream frames queue
         self._q_stream: queue.Queue[DParseFrame] = queue.Queue()
 
+        # user-frame listeners
+        self._user_listeners: dict[int, DUserFrameListener] = {}
+        self._user_listeners_lock = Lock()
+        self._user_listener_id = 0
+        self._request_lock = Lock()
+
         # channels configuration
         self._channels: DCommChannelsData
         self._channels_lock = Lock()
@@ -98,6 +112,38 @@ class CommHandler:
         # drop cached frames
         self._drop_all_frames()
 
+    def _is_user_frame(self, frame: DParseFrame) -> bool:
+        """Return True if frame ID belongs to user extension range."""
+        return int(frame.fid) >= int(EParseId.INVALID)
+
+    def _dispatch_user_frame(self, frame: DParseFrame) -> bool:
+        """Dispatch user frame to registered listeners.
+
+        :return: True if at least one listener handled the frame.
+        """
+        handled = False
+        fid = int(frame.fid)
+
+        with self._user_listeners_lock:
+            listeners = list(self._user_listeners.values())
+
+        for listener in listeners:
+            if listener.ids is not None and fid not in listener.ids:
+                continue
+
+            try:
+                ret = listener.callback(frame)
+            except Exception as exc:  # pragma: no cover
+                logger.error(
+                    "user frame callback failed for id=%d: %s", fid, exc
+                )
+                continue
+
+            if ret is not None and bool(ret):
+                handled = True
+
+        return handled
+
     def _recv_thread(self) -> None:
         """Recv thread."""
         frame = self._read_frame()
@@ -110,6 +156,9 @@ class CommHandler:
                     # drop ACK frames if we dont have dev info yet
                     pass
                 else:
+                    if self._is_user_frame(frame):
+                        if self._dispatch_user_frame(frame):
+                            return
                     self._q.put(frame)
 
     def _get_frame(self, timeout: float = 1.0) -> DParseFrame | None:
@@ -137,6 +186,21 @@ class CommHandler:
         # return ACK if ACK frames not supported or we don't know yet
         if self.dev is None or not self.dev.data.ack_supported:
             return ParseAck(True, 0)
+
+        frame = self._get_frame(timeout)
+        if frame is None:  # pragma: no cover
+            return ParseAck(False, -1)
+
+        ret = self._parse.frame_ack_decode(frame)
+        if ret is None:  # pragma: no cover
+            return ParseAck(False, -2)
+
+        return ret
+
+    def _get_ack_required(self, timeout: float = 1.0) -> ParseAck:
+        """Get ACK response, requiring ACK support from the device."""
+        if self.dev is None or not self.dev.data.ack_supported:
+            return ParseAck(False, -3)
 
         frame = self._get_frame(timeout)
         if frame is None:  # pragma: no cover
@@ -324,28 +388,28 @@ class CommHandler:
         """Channel enable."""
         assert self.dev
 
-        fwrite = self._parse.frame_enable(enable, self.dev.data.chmax)
-        self._intf.write(fwrite)
-
-        ack = self._get_ack(timeout=1.0)
+        with self._request_lock:
+            fwrite = self._parse.frame_enable(enable, self.dev.data.chmax)
+            self._intf.write(fwrite)
+            ack = self._get_ack(timeout=1.0)
         return ack
 
     def _channel_div(self, div: tuple[int, int] | list[int]) -> ParseAck:
         """Channel divider."""
         assert self.dev
 
-        fwrite = self._parse.frame_div(div, self.dev.data.chmax)
-        self._intf.write(fwrite)
-
-        ack = self._get_ack(timeout=1.0)
+        with self._request_lock:
+            fwrite = self._parse.frame_div(div, self.dev.data.chmax)
+            self._intf.write(fwrite)
+            ack = self._get_ack(timeout=1.0)
         return ack
 
     def _nxslib_cmninfo(self) -> ParseCmninfo | None:
         """Get nxslib cmninfo."""
-        fwrite = self._parse.frame_cmninfo()
-        self._intf.write(fwrite)
-
-        fread = self._get_frame(timeout=1.0)
+        with self._request_lock:
+            fwrite = self._parse.frame_cmninfo()
+            self._intf.write(fwrite)
+            fread = self._get_frame(timeout=1.0)
         if fread is None:  # pragma: no cover
             return None
 
@@ -356,10 +420,10 @@ class CommHandler:
 
         :param chan: channel ID
         """
-        chinfo = self._parse.frame_chinfo(chan)
-        self._intf.write(chinfo)
-
-        fread = self._get_frame(timeout=1.0)
+        with self._request_lock:
+            chinfo = self._parse.frame_chinfo(chan)
+            self._intf.write(chinfo)
+            fread = self._get_frame(timeout=1.0)
         if fread is None:  # pragma: no cover
             return None
 
@@ -475,19 +539,89 @@ class CommHandler:
 
     def stream_start(self) -> ParseAck | None:
         """Start stream."""
-        fwrite = self._parse.frame_start(True)
-        self._intf.write(fwrite)
-
-        ack = self._get_ack(timeout=1.0)
+        with self._request_lock:
+            fwrite = self._parse.frame_start(True)
+            self._intf.write(fwrite)
+            ack = self._get_ack(timeout=1.0)
         return ack
 
     def stream_stop(self) -> ParseAck | None:
         """Stop stream."""
-        fwrite = self._parse.frame_start(False)
-        self._intf.write(fwrite)
-
-        ack = self._get_ack(timeout=1.0)
+        with self._request_lock:
+            fwrite = self._parse.frame_start(False)
+            self._intf.write(fwrite)
+            ack = self._get_ack(timeout=1.0)
         return ack
+
+    def add_user_frame_listener(
+        self,
+        callback: Callable[[DParseFrame], bool | None],
+        frame_ids: list[int] | tuple[int, ...] | set[int] | None = None,
+    ) -> int:
+        """Register callback for user-defined frame IDs.
+
+        :param callback: function called for matching frames
+        :param frame_ids: optional IDs filter; None means all user frames
+        :return: listener registration ID
+        """
+        ids: set[int] | None
+        if frame_ids is None:
+            ids = None
+        else:
+            ids = set(frame_ids)
+            for fid in ids:
+                if fid < int(EParseId.INVALID) or fid > 0xFF:
+                    raise ValueError("frame id out of user range")
+
+        with self._user_listeners_lock:
+            listener_id = self._user_listener_id
+            self._user_listener_id += 1
+            self._user_listeners[listener_id] = DUserFrameListener(
+                ids=ids, callback=callback
+            )
+
+        return listener_id
+
+    def remove_user_frame_listener(self, listener_id: int) -> bool:
+        """Remove user-frame listener by ID."""
+        with self._user_listeners_lock:
+            if listener_id in self._user_listeners:
+                self._user_listeners.pop(listener_id)
+                return True
+
+        return False
+
+    def send_user_frame(
+        self,
+        fid: int,
+        payload: bytes,
+        ack_mode: str = "auto",
+        ack_timeout: float = 1.0,
+    ) -> ParseAck:
+        """Send user-defined frame with configurable ACK handling.
+
+        :param fid: user-defined frame ID in [EParseId.INVALID, 255]
+        :param payload: raw payload bytes
+        :param ack_mode: auto, required, or disabled
+        :param ack_timeout: ACK wait timeout in seconds
+        """
+        if fid < int(EParseId.INVALID) or fid > 0xFF:
+            raise ValueError("fid must be in user frame ID range")
+
+        if ack_mode not in {"auto", "required", "disabled"}:
+            raise ValueError("ack_mode must be auto, required or disabled")
+
+        with self._request_lock:
+            frame = self._parse.frame.frame_create(fid, payload)
+            self._intf.write(frame)
+
+            if ack_mode == "disabled":
+                return ParseAck(True, 0)
+
+            if ack_mode == "required":
+                return self._get_ack_required(timeout=ack_timeout)
+
+            return self._get_ack(timeout=ack_timeout)
 
     def stream_data(self) -> DParseStream | None:
         """Get stream data."""

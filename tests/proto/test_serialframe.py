@@ -1,3 +1,5 @@
+import struct
+
 import pytest  # type: ignore
 
 from nxslib.proto.iframe import EParseError, ICommFrame
@@ -65,12 +67,19 @@ def test_nxslibproto_init():
     assert frame_decoded.data == data
     assert hdr.err is EParseError.NOERR
 
-    # create frame - invalid id
+    # user-defined id should be accepted by the frame layer
     _id = 200
     data = b"abblllaa"
     frame_encoded = proto.frame_create(_id, data)
     frame_decoded = proto.frame_decode(frame_encoded)
-    assert frame_decoded.err is EParseError.HDR
+    assert frame_decoded.err is EParseError.NOERR
+    assert frame_decoded.fid == _id
+    assert frame_decoded.data == data
+
+    # header decode should preserve unknown ids
+    hdr = proto.hdr_decode(struct.pack("<BHB", 0x55, 6, 200))
+    assert hdr.err is EParseError.NOERR
+    assert hdr.fid == 200
 
     _id = 1
     data = b"abblllaa"
