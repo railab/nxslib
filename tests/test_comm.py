@@ -147,6 +147,36 @@ def test_nxslib_stream_ch1(comm):
         # do not stop stream but disconnect
 
 
+def test_nxslib_stream_numpy(comm):
+    with comm:
+        comm.channels_default_cfg()
+        comm.ch_enable(1)
+        comm.channels_write()
+
+        # no stream - should be no data
+        assert comm.stream_data_numpy() is None
+
+        comm.stream_start()
+        data = comm.stream_data_numpy()
+        assert data is not None
+        assert data.flags == 0
+        assert len(data.blocks) > 0
+        assert data.blocks[0].data.shape[1] == 1
+
+
+def test_nxslib_stream_numpy_no_decoder(comm):
+    with comm:
+        comm.channels_default_cfg()
+        comm.ch_enable(1)
+        comm.channels_write()
+        comm.stream_start()
+        # simulate parser without numpy decode implementation
+        comm._parse.frame_stream_decode_numpy = (  # type: ignore[attr-defined]
+            None
+        )
+        assert comm.stream_data_numpy() is None
+
+
 def test_nxslib_stream_ch1ch2(comm):
     with comm:
         # default configuration

@@ -5,7 +5,7 @@ import time
 import pytest  # type: ignore
 
 from nxslib.intf.dummy import DummyDev
-from nxslib.nxscope import NxscopeHandler
+from nxslib.nxscope import DNxscopeStream, NxscopeHandler
 from nxslib.proto.parse import Parser
 
 
@@ -16,6 +16,25 @@ def test_nxscope_context_manager():
         intf, parse, drop_timeout=0.01, stream_data_timeout=0.05
     ) as nxscope:
         assert nxscope.dev is not None
+
+
+def test_nxscope_invalid_stream_mode():
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+    with pytest.raises(ValueError):
+        NxscopeHandler(
+            intf,
+            parse,
+            stream_decode_mode="invalid",
+            drop_timeout=0.01,
+            stream_data_timeout=0.05,
+        )
+
+
+def test_nxscope_stream_item_repr_and_str():
+    item = DNxscopeStream(data=(1, 2), meta=(3,))
+    assert str(item) == "(1, 2), (3,)"
+    assert repr(item) == "(1, 2), (3,)"
 
 
 def test_dummy_context_manager():
@@ -92,6 +111,28 @@ def test_nxscope_stream():
         nxscope.stream_unsub(q0_0)
         nxscope.stream_unsub(q0_1)
 
+
+def test_nxscope_stream_numpy_mode():
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+    with NxscopeHandler(
+        intf,
+        parse,
+        stream_decode_mode="numpy",
+        drop_timeout=0.01,
+        stream_data_timeout=0.05,
+    ) as nxscope:
+        q0 = nxscope.stream_sub(0)
+        nxscope.channels_default_cfg()
+        nxscope.ch_enable([0], writenow=True)
+        nxscope.stream_start()
+        payload = q0.get(block=True, timeout=0.5)
+        assert payload
+        block = payload[0]
+        assert hasattr(block.data, "shape")
+        nxscope.stream_stop()
+        nxscope.stream_unsub(q0)
+
         # configure channels
         nxscope.channels_default_cfg()
         # enable/disable
@@ -128,6 +169,31 @@ def test_nxscope_stream():
 
         nxscope.stream_unsub(q0_0)
         nxscope.stream_unsub(q0_1)
+
+
+def test_nxscope_stream_numpy_bitrate_updates_without_enabled_channels():
+    intf = DummyDev(thread_timeout=0.05)
+    parse = Parser()
+    with NxscopeHandler(
+        intf,
+        parse,
+        enable_bitrate_tracking=True,
+        stream_decode_mode="numpy",
+        drop_timeout=0.01,
+        stream_data_timeout=0.05,
+    ) as nxscope:
+        nxscope.channels_default_cfg(writenow=True)
+        nxscope.ch_enable([0], writenow=True)
+
+        def _channel_disabled(_chan: int) -> bool:
+            return False
+
+        nxscope._comm.ch_is_enabled = _channel_disabled  # type: ignore
+        nxscope.stream_start()
+        time.sleep(0.2)
+        nxscope.stream_stop()
+        stats = nxscope.get_stream_stats()
+        assert stats.bitrate > 0.0
 
 
 def test_nxscope_channels_runtime():
