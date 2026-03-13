@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any
 from nxslib.dev import Device, DeviceChannel, EDeviceChannelType
 
 if TYPE_CHECKING:
+    import numpy as np
+
     from nxslib.proto.iframe import DParseFrame, ICommFrame
 
 ###############################################################################
@@ -92,6 +94,36 @@ class DParseStream:
 
     flags: int
     samples: list[DParseStreamData]
+
+
+###############################################################################
+# Class: DParseStreamBlock
+###############################################################################
+
+
+@dataclass
+class DParseStreamBlock:
+    """Nxslib stream block data for NumPy mode."""
+
+    chan: int
+    dtype: int
+    vdim: int
+    mlen: int
+    data: "np.ndarray[Any, Any]"
+    meta: "np.ndarray[Any, Any] | None"
+
+
+###############################################################################
+# Class: DParseStreamNumpy
+###############################################################################
+
+
+@dataclass
+class DParseStreamNumpy:
+    """Nxslib stream data grouped as NumPy channel blocks."""
+
+    flags: int
+    blocks: list[DParseStreamBlock]
 
 
 ###############################################################################

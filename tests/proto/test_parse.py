@@ -1,3 +1,5 @@
+import numpy as np
+
 from nxslib.dev import Device, DeviceChannel, EDeviceChannelType
 from nxslib.proto.iframe import DParseFrame, EParseId, ICommFrame
 from nxslib.proto.iparse import DsfmtItem, EParseDataType
@@ -267,3 +269,152 @@ def test_nxslibparse_stream_user():
     assert sdata.samples[0].mlen == 1
     assert sdata.samples[0].data == (b"a", b"b", 0, 0)
     assert sdata.samples[0].meta == (1,)
+
+
+def test_nxslibparse_stream_numpy():
+    parse = Parser()
+    chans = [
+        DeviceChannel(
+            0,
+            EDeviceChannelType.INT16.value,
+            1,
+            "chan0",
+            mlen=4,
+            func=None,
+        ),
+        DeviceChannel(
+            1,
+            EDeviceChannelType.INT16.value,
+            1,
+            "chan1",
+            mlen=4,
+            func=None,
+        ),
+    ]
+    dev = Device(2, 0, 0, chans)
+
+    # flags=1, then 3 interleaved samples with metadata
+    # ch0:10 meta1, ch1:20 meta2, ch0:30 meta3
+    data = (
+        b"\x01"
+        + b"\x00\x0a\x00\x01\x00\x00\x00"
+        + b"\x01\x14\x00\x02\x00\x00\x00"
+        + b"\x00\x1e\x00\x03\x00\x00\x00"
+    )
+    frame = DParseFrame(EParseId.STREAM, data)
+
+    sdata = parse.frame_stream_decode_numpy(frame, dev)
+    assert sdata is not None
+    assert sdata.flags == 1
+    assert len(sdata.blocks) == 2
+
+    b0 = sdata.blocks[0]
+    assert b0.chan == 0
+    assert b0.dtype == EParseDataType.NUM
+    assert b0.data.shape == (2, 1)
+    assert np.array_equal(b0.data[:, 0], np.array([10, 30], dtype=np.int16))
+    assert b0.meta is not None
+    assert np.array_equal(b0.meta[:, 0], np.array([1, 3], dtype=np.uint32))
+
+    b1 = sdata.blocks[1]
+    assert b1.chan == 1
+    assert b1.dtype == EParseDataType.NUM
+    assert b1.data.shape == (1, 1)
+    assert np.array_equal(b1.data[:, 0], np.array([20], dtype=np.int16))
+    assert b1.meta is not None
+    assert np.array_equal(b1.meta[:, 0], np.array([2], dtype=np.uint32))
+
+
+def test_nxslibparse_stream_numpy_guard_branches():
+    parse = Parser()
+    chan = DeviceChannel(
+        0,
+        EDeviceChannelType.INT16.value,
+        1,
+        "chan0",
+        mlen=0,
+        func=None,
+    )
+    dev = Device(1, 0, 0, [chan])
+
+    assert parse.frame_stream_decode_numpy(None, dev) is None
+    assert (
+        parse.frame_stream_decode_numpy(
+            DParseFrame(EParseId.CMNINFO, b"\x00"), dev
+        )
+        is None
+    )
+    assert (
+        parse.frame_stream_decode_numpy(DParseFrame(EParseId.STREAM, b""), dev)
+        is None
+    )
+
+
+def test_nxslibparse_stream_numpy_scaled_and_object_paths():
+    parse = Parser()
+    chans = [
+        DeviceChannel(
+            0,
+            EDeviceChannelType.UB8.value,
+            1,
+            "scaled",
+            mlen=8,
+            func=None,
+        ),
+        DeviceChannel(
+            1,
+            EDeviceChannelType.CHAR.value,
+            2,
+            "char",
+            mlen=3,
+            func=None,
+        ),
+    ]
+    dev = Device(2, 0, 0, chans)
+
+    data = (
+        b"\x00"
+        + b"\x00\x80\x01\x01\x00\x00\x00\x00\x00\x00\x00"
+        + b"\x01ab\x11\x22\x33"
+    )
+    frame = DParseFrame(EParseId.STREAM, data)
+    sdata = parse.frame_stream_decode_numpy(frame, dev)
+
+    assert sdata is not None
+    assert len(sdata.blocks) == 2
+
+    scaled = sdata.blocks[0]
+    assert scaled.data.dtype == np.float64
+    assert scaled.meta is not None
+    assert scaled.meta.dtype == np.uint64
+    assert np.isclose(float(scaled.data[0, 0]), 1.5)
+    assert int(scaled.meta[0, 0]) == 1
+
+    chars = sdata.blocks[1]
+    assert chars.data.dtype == np.object_
+    assert chars.meta is not None
+    assert chars.meta.dtype == np.uint8
+    assert chars.data[0, 0] == "ab"
+    assert np.array_equal(
+        chars.meta[0, :],
+        np.array([0x11, 0x22, 0x33], dtype=np.uint8),
+    )
+
+
+def test_nxslibparse_stream_numpy_object_path_zero_vdim():
+    parse = Parser()
+    chan = DeviceChannel(
+        0,
+        EDeviceChannelType.NONE.value,
+        0,
+        "none",
+        mlen=0,
+        func=None,
+    )
+    dev = Device(1, 0, 0, [chan])
+    frame = DParseFrame(EParseId.STREAM, b"\x00\x00")
+    sdata = parse.frame_stream_decode_numpy(frame, dev)
+    assert sdata is not None
+    assert len(sdata.blocks) == 1
+    block = sdata.blocks[0]
+    assert block.data.shape == (1, 0)

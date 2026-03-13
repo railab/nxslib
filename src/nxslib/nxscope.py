@@ -1,11 +1,14 @@
 """Module containing the NxScope handler."""
 
+import os
 import queue
 from collections import deque
 from dataclasses import dataclass
 from threading import Lock
 from time import time
 from typing import TYPE_CHECKING, Any
+
+import numpy as np
 
 from nxslib.comm import CommHandler
 from nxslib.logger import logger
@@ -15,7 +18,7 @@ from nxslib.thread import ThreadCommon
 if TYPE_CHECKING:
     from nxslib.dev import Device, DeviceChannel
     from nxslib.intf.iintf import ICommInterface
-    from nxslib.proto.iparse import ICommParse
+    from nxslib.proto.iparse import DParseStreamNumpy, ICommParse
 
 
 ###############################################################################
@@ -37,6 +40,19 @@ class DNxscopeStream:
     def __repr__(self) -> str:
         """Represent stream item as string."""
         return str(self.data) + ", " + str(self.meta)
+
+
+###############################################################################
+# Data: DNxscopeStreamBlock
+###############################################################################
+
+
+@dataclass
+class DNxscopeStreamBlock:
+    """NumPy block stream item."""
+
+    data: np.ndarray[Any, Any]
+    meta: np.ndarray[Any, Any] | None
 
 
 ###############################################################################
@@ -152,6 +168,7 @@ class NxscopeHandler:
         intf: "ICommInterface",
         parse: "ICommParse",
         enable_bitrate_tracking: bool = False,
+        stream_decode_mode: str | None = None,
         drop_timeout: float = 0.1,
         stream_data_timeout: float = 1.0,
     ) -> None:
@@ -161,6 +178,9 @@ class NxscopeHandler:
         :param parse: Protocol parser
         :param enable_bitrate_tracking: Enable bitrate tracking
             (default: False)
+        :param stream_decode_mode: stream decode mode: `legacy` or `numpy`.
+            If not provided, uses environment variable
+            `NXSCOPE_STREAM_DECODE_MODE` (default: `legacy`).
         :param drop_timeout: timeout used in _drop_all_frames queue drains
         :param stream_data_timeout: timeout used in stream_data() frame wait
         """
@@ -174,7 +194,14 @@ class NxscopeHandler:
 
         self._thrd = ThreadCommon(self._stream_thread, name="stream")
 
-        self._sub_q: list[list[queue.Queue[list[DNxscopeStream]]]] = []
+        mode = stream_decode_mode or os.getenv(
+            "NXSCOPE_STREAM_DECODE_MODE", "legacy"
+        )
+        if mode not in ("legacy", "numpy"):
+            raise ValueError("stream_decode_mode must be `legacy` or `numpy`")
+        self._stream_decode_mode = mode
+
+        self._sub_q: list[list[queue.Queue[Any]]] = []
         self._queue_lock: Lock = Lock()
 
         self._stream_started: bool = False
@@ -212,52 +239,80 @@ class NxscopeHandler:
 
         return ret.state
 
-    def _stream_thread(self) -> None:
+    def _stream_thread(self) -> None:  # noqa: C901
         """Stream thread."""
         assert self.dev
         chmax = self.dev.data.chmax
 
-        samples: list[list[DNxscopeStream]]
-        samples = [[] for _ in range(chmax)]
+        if self._stream_decode_mode == "numpy":
+            samples_block: list[list[DNxscopeStreamBlock]] = [
+                [] for _ in range(chmax)
+            ]
+            sdata_np: "DParseStreamNumpy | None" = (
+                self._comm.stream_data_numpy()
+            )
+            if not sdata_np:
+                return
 
-        # get stream data
-        sdata = self._comm.stream_data()
-        if sdata:
             if (
-                self._comm.flags_is_overflow(sdata.flags) is True
+                self._comm.flags_is_overflow(sdata_np.flags) is True
             ):  # pragma: no cover
                 logger.info("stream flags: OVERFLOW!")
                 with self._stats_lock:
                     self._ovf_cntr += 1
 
-            # Track bytes for all samples
-            for data in sdata.samples:
-                # Track bytes for bitrate calculation for all samples
-                # Get channel info to get correct type
-                ch = self.dev_channel_get(data.chan)
-                if ch:
-                    dsfmt = dsfmt_get(ch.data.dtype)
-                    data_bytes = dsfmt.slen * ch.data.vdim
-                    meta_bytes = ch.data.mlen
-                    total_bytes = data_bytes + meta_bytes
-                    if self._bitrate_tracker is not None:
-                        self._bitrate_tracker.update(total_bytes)
+            for block in sdata_np.blocks:
+                if self._bitrate_tracker is not None:
+                    data_bytes = int(block.data.size * block.data.itemsize)
+                    meta_bytes = (
+                        0
+                        if block.meta is None
+                        else int(block.meta.size * block.meta.itemsize)
+                    )
+                    self._bitrate_tracker.update(data_bytes + meta_bytes)
 
-                # channel enabled
-                if (
-                    self._comm.ch_is_enabled(data.chan) is True
-                ):  # pragma: no cover
-                    samples[data.chan].append(
-                        DNxscopeStream(data.data, data.meta)
+                if self._comm.ch_is_enabled(block.chan) is True:
+                    samples_block[block.chan].append(
+                        DNxscopeStreamBlock(block.data, block.meta)
                     )
 
             with self._queue_lock:
-                # send all samples at once
                 for chan_id in range(chmax):
-                    if len(samples[chan_id]) > 0:
-                        # send for all subscribers
+                    if len(samples_block[chan_id]) > 0:
                         for que in self._sub_q[chan_id]:
-                            que.put(samples[chan_id])
+                            que.put(samples_block[chan_id])
+            return
+
+        samples: list[list[DNxscopeStream]] = [[] for _ in range(chmax)]
+
+        sdata = self._comm.stream_data()
+        if not sdata:
+            return
+        if (
+            self._comm.flags_is_overflow(sdata.flags) is True
+        ):  # pragma: no cover
+            logger.info("stream flags: OVERFLOW!")
+            with self._stats_lock:
+                self._ovf_cntr += 1
+
+        for data in sdata.samples:
+            ch = self.dev_channel_get(data.chan)
+            if ch:
+                dsfmt = dsfmt_get(ch.data.dtype)
+                data_bytes = dsfmt.slen * ch.data.vdim
+                meta_bytes = ch.data.mlen
+                total_bytes = data_bytes + meta_bytes
+                if self._bitrate_tracker is not None:
+                    self._bitrate_tracker.update(total_bytes)
+
+            if self._comm.ch_is_enabled(data.chan) is True:  # pragma: no cover
+                samples[data.chan].append(DNxscopeStream(data.data, data.meta))
+
+        with self._queue_lock:
+            for chan_id in range(chmax):
+                if len(samples[chan_id]) > 0:
+                    for que in self._sub_q[chan_id]:
+                        que.put(samples[chan_id])
 
     def _reset_stats(self) -> None:
         with self._stats_lock:
@@ -413,19 +468,19 @@ class NxscopeHandler:
 
             self._stream_started = False
 
-    def stream_sub(self, chan: int) -> queue.Queue[list[DNxscopeStream]]:
+    def stream_sub(self, chan: int) -> queue.Queue[Any]:
         """Subscribe to a given channel.
 
         :param chid: the channel ID
         """
-        subq: queue.Queue[list[DNxscopeStream]] = queue.Queue()
+        subq: queue.Queue[Any] = queue.Queue()
 
         with self._queue_lock:
             self._sub_q[chan].append(subq)
 
         return subq
 
-    def stream_unsub(self, subq: queue.Queue[list[DNxscopeStream]]) -> None:
+    def stream_unsub(self, subq: queue.Queue[Any]) -> None:
         """Unsubscribe from a given channel.
 
         :param subq: the queue instance that was used with the channel

@@ -4,13 +4,14 @@ import copy
 import queue
 from dataclasses import dataclass
 from threading import Lock
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable, cast
 
 from nxslib.dev import Device, DeviceChannel
 from nxslib.logger import logger
 from nxslib.proto.iframe import DParseFrame, DParseHdr, EParseError
 from nxslib.proto.iparse import (
     DParseStream,
+    DParseStreamNumpy,
     EParseStreamFlags,
     ICommParse,
     ParseAck,
@@ -19,8 +20,6 @@ from nxslib.proto.iparse import (
 from nxslib.thread import ThreadCommon
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from nxslib.intf.iintf import ICommInterface
 
 ###############################################################################
@@ -503,6 +502,24 @@ class CommHandler:
         ret = self._parse.frame_stream_decode(frame, self.dev)
 
         return ret
+
+    def stream_data_numpy(self) -> DParseStreamNumpy | None:
+        """Get stream data decoded as NumPy blocks."""
+        assert self.dev
+
+        frame = self._get_stream_frame(timeout=self._stream_data_timeout)
+        if not frame:
+            return None
+
+        assert self._parse.frame_is_stream(frame)
+        decoder = cast(
+            "Callable[[DParseFrame, Device], DParseStreamNumpy | None] | None",
+            getattr(self._parse, "frame_stream_decode_numpy", None),
+        )
+        if decoder is None:
+            return None
+
+        return decoder(frame, self.dev)
 
     def channels_write(self) -> None:
         """Initialize channels for stream.
