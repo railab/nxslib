@@ -88,6 +88,14 @@ Connect to a device that supports NxScope over the Segger RTT interface:
    with RTTDevice("STM32G431CB", buffer_index=1, upsize=2048, interface="swd") as intf:
        ...
 
+Connect to a device that supports NxScope over UDP:
+
+.. code-block:: python
+
+   from nxslib.intf.udp import UdpDevice
+   with UdpDevice("192.168.0.10", 50000, local_port=0, timeout=1.0) as intf:
+       ...
+
 All interface classes support the context manager protocol:
 
 .. code-block:: python
@@ -147,3 +155,18 @@ You can use `socat` to connect to a simulated NuttX target:
    stty -F $SERIAL_HOST raw
    stty -F $SERIAL_NUTTX 115200
    stty -F $SERIAL_HOST 115200
+
+UDP interface
+"""""""""""""
+
+Use `UdpDevice` when the target exposes NxScope over UDP.
+By default it binds to an ephemeral local port (`local_port=0`) and
+reads with a 1 second timeout.
+
+.. code-block:: python
+
+   from nxslib.intf.udp import UdpDevice
+
+   with UdpDevice("127.0.0.1", 50000, timeout=0.2) as intf:
+       # pass `intf` to NxscopeHandler
+       ...
