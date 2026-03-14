@@ -6,6 +6,12 @@ from nxslib.dev import (
 from nxslib.intf.dummy import (
     ChannelFunc0,
     ChannelFunc1,
+    ChannelFunc10,
+    ChannelFunc11,
+    ChannelFunc12,
+    ChannelFunc13,
+    ChannelFunc14,
+    ChannelFunc15,
     ChannelFunc2,
     ChannelFunc3,
     ChannelFunc4,
@@ -108,6 +114,42 @@ def test_dummy_channelfunc():  # noqa: C901
     for x in range(1001):
         _ = c.get(x)
 
+    c = ChannelFunc10()
+    c.reset()
+    assert isinstance(c.get(0), DDeviceChannelFuncData)
+    for x in range(1001):
+        _ = c.get(x)
+
+    c = ChannelFunc11()
+    c.reset()
+    assert isinstance(c.get(0), DDeviceChannelFuncData)
+    for x in range(1001):
+        _ = c.get(x)
+
+    c = ChannelFunc12()
+    c.reset()
+    assert isinstance(c.get(0), DDeviceChannelFuncData)
+    for x in range(1001):
+        _ = c.get(x)
+
+    c = ChannelFunc13()
+    c.reset()
+    assert isinstance(c.get(0), DDeviceChannelFuncData)
+    for x in range(1001):
+        _ = c.get(x)
+
+    c = ChannelFunc14()
+    c.reset()
+    assert isinstance(c.get(0), DDeviceChannelFuncData)
+    for x in range(1001):
+        _ = c.get(x)
+
+    c = ChannelFunc15()
+    c.reset()
+    assert isinstance(c.get(0), DDeviceChannelFuncData)
+    for x in range(1001):
+        _ = c.get(x)
+
 
 def test_dummy_divider_affects_stream_rate():
     channel = DeviceChannel(
@@ -128,3 +170,85 @@ def test_dummy_divider_affects_stream_rate():
     dev._div_counters = [0]
     reduced_rate = dev._stream_data_get(20)
     assert len(reduced_rate) == 4
+
+
+def test_dummy_special_channels_are_deterministic():
+    c_fft = ChannelFunc10()
+    c_hist = ChannelFunc12()
+    c_bimodal = ChannelFunc13()
+    c_xy = ChannelFunc14()
+    c_polar = ChannelFunc15()
+
+    c_fft.reset()
+    c_hist.reset()
+    c_bimodal.reset()
+    c_xy.reset()
+    c_polar.reset()
+
+    fft_first = [
+        c_fft.get(i).data for i in range(8)
+    ]  # type: ignore[union-attr]
+    hist_first = [
+        c_hist.get(i).data for i in range(8)
+    ]  # type: ignore[union-attr]
+    bimodal_first = [
+        c_bimodal.get(i).data for i in range(8)
+    ]  # type: ignore[union-attr]
+    xy_first = [c_xy.get(i).data for i in range(8)]  # type: ignore[union-attr]
+    polar_first = [
+        c_polar.get(i).data for i in range(8)
+    ]  # type: ignore[union-attr]
+
+    c_fft.reset()
+    c_hist.reset()
+    c_bimodal.reset()
+    c_xy.reset()
+    c_polar.reset()
+
+    fft_second = [
+        c_fft.get(i).data for i in range(8)
+    ]  # type: ignore[union-attr]
+    hist_second = [
+        c_hist.get(i).data for i in range(8)
+    ]  # type: ignore[union-attr]
+    bimodal_second = [
+        c_bimodal.get(i).data for i in range(8)
+    ]  # type: ignore[union-attr]
+    xy_second = [
+        c_xy.get(i).data for i in range(8)
+    ]  # type: ignore[union-attr]
+    polar_second = [
+        c_polar.get(i).data for i in range(8)
+    ]  # type: ignore[union-attr]
+
+    assert fft_first == fft_second
+    assert hist_first == hist_second
+    assert bimodal_first == bimodal_second
+    assert xy_first == xy_second
+    assert polar_first == polar_second
+
+
+def test_dummy_hist_bimodal_crosses_zero():
+    c = ChannelFunc13()
+    c.reset()
+    vals = [c.get(i).data[0] for i in range(20)]  # type: ignore[union-attr]
+    assert min(vals) < 0.0
+    assert max(vals) > 0.0
+
+
+def test_dummy_xy_channel_is_2d_and_bounded():
+    c = ChannelFunc14()
+    c.reset()
+    vals = [c.get(i).data for i in range(30)]  # type: ignore[union-attr]
+    assert all(len(v) == 2 for v in vals)
+    assert all(-1.0 <= v[0] <= 1.0 for v in vals)
+    assert all(-1.0 <= v[1] <= 1.0 for v in vals)
+
+
+def test_dummy_polar_channel_ranges():
+    c = ChannelFunc15()
+    c.reset()
+    vals = [c.get(i).data for i in range(30)]  # type: ignore[union-attr]
+    assert all(len(v) == 2 for v in vals)
+    assert all(0.0 <= v[0] <= 2.0 * 3.141592653589793 for v in vals)
+    assert all(v[1] > 0.0 for v in vals)

@@ -190,6 +190,129 @@ class ChannelFunc9(IDeviceChannelFunc):
         return DDeviceChannelFuncData(data=data)
 
 
+class ChannelFunc10(IDeviceChannelFunc):
+    """Generate a deterministic multi-tone signal for FFT tests."""
+
+    _cntr = 0
+
+    def reset(self) -> None:
+        """Reset handler."""
+        self._cntr = 0
+
+    def get(self, _: int) -> DDeviceChannelFuncData:
+        """Get sample data."""
+        x = 2 * math.pi * self._cntr / 256.0
+        data = (
+            0.8 * math.sin(3.0 * x)
+            + 0.4 * math.sin(11.0 * x)
+            + 0.2 * math.sin(19.0 * x),
+        )
+        self._cntr += 1
+        self._cntr %= 256
+
+        return DDeviceChannelFuncData(data=data)
+
+
+class ChannelFunc11(IDeviceChannelFunc):
+    """Generate deterministic chirp-like data for spectrogram tests."""
+
+    _cntr = 0
+
+    def reset(self) -> None:
+        """Reset handler."""
+        self._cntr = 0
+
+    def get(self, _: int) -> DDeviceChannelFuncData:
+        """Get sample data."""
+        t = self._cntr / 1000.0
+        phase = 2.0 * math.pi * (3.0 * t + 20.0 * t * t)
+        data = (math.sin(phase),)
+        self._cntr += 1
+        self._cntr %= 1000
+
+        return DDeviceChannelFuncData(data=data)
+
+
+class ChannelFunc12(IDeviceChannelFunc):
+    """Generate deterministic Gaussian-like scalar samples for histograms."""
+
+    _seed = 12345
+
+    def reset(self) -> None:
+        """Reset handler."""
+        self._rng = random.Random(self._seed)
+
+    def get(self, _: int) -> DDeviceChannelFuncData:
+        """Get sample data."""
+        data = (self._rng.gauss(0.0, 1.0),)
+        return DDeviceChannelFuncData(data=data)
+
+
+class ChannelFunc13(IDeviceChannelFunc):
+    """Generate deterministic bi-modal samples for histogram tests."""
+
+    _cntr = 0
+    _seed = 23456
+
+    def reset(self) -> None:
+        """Reset handler."""
+        self._cntr = 0
+        self._rng = random.Random(self._seed)
+
+    def get(self, _: int) -> DDeviceChannelFuncData:
+        """Get sample data."""
+        if self._cntr % 2:
+            base = -2.5
+        else:
+            base = 2.5
+
+        data = (base + self._rng.gauss(0.0, 0.2),)
+        self._cntr += 1
+        return DDeviceChannelFuncData(data=data)
+
+
+class ChannelFunc14(IDeviceChannelFunc):
+    """Generate correlated (x, y) data for XY/Lissajous plots."""
+
+    _cntr = 0
+
+    def reset(self) -> None:
+        """Reset handler."""
+        self._cntr = 0
+
+    def get(self, _: int) -> DDeviceChannelFuncData:
+        """Get sample data."""
+        x = 2 * math.pi * self._cntr / 500
+        data = (
+            math.sin(3.0 * x),
+            math.sin(4.0 * x + math.pi / 5.0),
+        )
+        self._cntr += 1
+        self._cntr %= 500
+
+        return DDeviceChannelFuncData(data=data)
+
+
+class ChannelFunc15(IDeviceChannelFunc):
+    """Generate (theta, radius) tuples for polar plot tests."""
+
+    _cntr = 0
+
+    def reset(self) -> None:
+        """Reset handler."""
+        self._cntr = 0
+
+    def get(self, _: int) -> DDeviceChannelFuncData:
+        """Get sample data."""
+        theta = (2.0 * math.pi * self._cntr / 360.0) % (2.0 * math.pi)
+        radius = 1.0 + 0.35 * math.sin(5.0 * theta)
+        data = (theta, radius)
+        self._cntr += 1
+        self._cntr %= 360
+
+        return DDeviceChannelFuncData(data=data)
+
+
 DUMMY_DEV_CHANNELS = [
     DeviceChannel(
         0,
@@ -269,6 +392,48 @@ DUMMY_DEV_CHANNELS = [
         0,
         "",
         func=None,
+    ),
+    DeviceChannel(
+        11,
+        EDeviceChannelType.FLOAT.value,
+        1,
+        "fft_multitone",
+        func=ChannelFunc10(),
+    ),
+    DeviceChannel(
+        12,
+        EDeviceChannelType.FLOAT.value,
+        1,
+        "fft_chirp",
+        func=ChannelFunc11(),
+    ),
+    DeviceChannel(
+        13,
+        EDeviceChannelType.FLOAT.value,
+        1,
+        "hist_gauss",
+        func=ChannelFunc12(),
+    ),
+    DeviceChannel(
+        14,
+        EDeviceChannelType.FLOAT.value,
+        1,
+        "hist_bimodal",
+        func=ChannelFunc13(),
+    ),
+    DeviceChannel(
+        15,
+        EDeviceChannelType.FLOAT.value,
+        2,
+        "xy_lissajous",
+        func=ChannelFunc14(),
+    ),
+    DeviceChannel(
+        16,
+        EDeviceChannelType.FLOAT.value,
+        2,
+        "polar_theta_radius",
+        func=ChannelFunc15(),
     ),
 ]
 DUMMY_DEV_CHMAX = len(DUMMY_DEV_CHANNELS)
