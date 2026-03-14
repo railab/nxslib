@@ -1,6 +1,7 @@
 """Module containing the NxScope data parser."""
 
 import struct
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -22,6 +23,27 @@ from nxslib.proto.iparse import (
     msfmt_get,
 )
 from nxslib.proto.serialframe import SerialFrame
+
+
+@dataclass(frozen=True)
+class _NumpyChanDecode:
+    """Cached NumPy decode descriptor for a single channel."""
+
+    fingerprint: tuple[int, int, int]
+    chan: int
+    decode: DsfmtItem
+    vdim: int
+    mlen: int
+    data_bytes: int
+    packet_bytes: int
+    fallback_fmt: str
+    numeric_fast: bool
+    np_dtype: np.dtype[Any] | None
+    needs_scale: bool
+    scale: float
+    out_dtype: np.dtype[Any]
+    meta_scalar_fmt: str | None
+
 
 ###############################################################################
 # Class: Parser
@@ -67,6 +89,9 @@ class Parser(ICommParse):
         """
         self._frame = frame()
         self._user_types = user_types
+        self._numpy_chan_decode_cache: list[_NumpyChanDecode | None] = [
+            None
+        ] * 256
 
     def _frame_set_data(self, flags: int, chan: int = 0) -> bytes:
         return struct.pack("BB", flags, chan)
@@ -263,106 +288,94 @@ class Parser(ICommParse):
         if not frame.data:
             return None
 
-        data_mv = memoryview(frame.data)
         frame_data = frame.data
+        frame_len = len(frame_data)
         chan_counts = [0] * 256
-        chan_info: list[tuple[DsfmtItem, int, int] | None] = [None] * 256
+        chan_info: list[_NumpyChanDecode | None] = [None] * 256
         active_chanids: list[int] = []
 
         # Pass 1: count samples per channel.
         i = 1
-        while i < len(data_mv):
-            chanid = data_mv[i]
-            chan = dev.channel_get(chanid)
-            assert chan
+        while i < frame_len:
+            chanid = frame_data[i]
             i += 1
 
             info = chan_info[chanid]
             if info is None:
-                decode = dsfmt_get(chan.data.dtype, self._user_types)
-                info = (decode, chan.data.vdim, chan.data.mlen)
+                chan = dev.channel_get(chanid)
+                assert chan
+                info = self._numpy_chan_decode_get(chan)
                 chan_info[chanid] = info
                 active_chanids.append(chanid)
-            decode, vdim, mlen = info
 
-            i += decode.slen * vdim + mlen
+            i += info.packet_bytes
             chan_counts[chanid] += 1
 
         # Allocate output blocks per channel.
-        data_out: dict[int, np.ndarray[Any, Any]] = {}
-        meta_out: dict[int, np.ndarray[Any, Any] | None] = {}
+        data_out: list[np.ndarray[Any, Any] | None] = [None] * 256
+        meta_out: list[np.ndarray[Any, Any] | None] = [None] * 256
         write_idx = [0] * 256
         for chanid in active_chanids:
             nsamples = chan_counts[chanid]
             info = chan_info[chanid]
             assert info is not None
-            decode, vdim, mlen = info
-            if (
-                decode.dtype == EParseDataType.NUM
-                and not decode.user
-                and decode.dsfmt in self._NUMPY_DTYPE_MAP
-            ):
-                dtype = self._NUMPY_DTYPE_MAP[decode.dsfmt]
-                if decode.scale and decode.scale != 1:
-                    dtype = np.dtype(np.float64)
-                data_out[chanid] = np.empty((nsamples, vdim), dtype=dtype)
-            else:
-                data_out[chanid] = np.empty((nsamples, vdim), dtype=np.object_)
+            data_out[chanid] = np.empty(
+                (nsamples, info.vdim), dtype=info.out_dtype
+            )
 
-            if mlen == 0:
+            if info.mlen == 0:
                 meta_out[chanid] = None
-            elif mlen in self._META_SCALAR_NUMPY_DTYPE:
+            elif info.meta_scalar_fmt is not None:
                 meta_out[chanid] = np.empty(
                     (nsamples, 1),
-                    dtype=self._META_SCALAR_NUMPY_DTYPE[mlen],
+                    dtype=self._META_SCALAR_NUMPY_DTYPE[info.mlen],
                 )
             else:
-                meta_out[chanid] = np.empty((nsamples, mlen), dtype=np.uint8)
+                meta_out[chanid] = np.empty(
+                    (nsamples, info.mlen), dtype=np.uint8
+                )
 
         # Pass 2: decode and fill.
         i = 1
-        while i < len(data_mv):
-            chanid = data_mv[i]
+        while i < frame_len:
+            chanid = frame_data[i]
             i += 1
             info = chan_info[chanid]
             assert info is not None
-            decode, vdim, mlen = info
             row = write_idx[chanid]
+            darray = data_out[chanid]
+            assert darray is not None
+            data_bytes = info.data_bytes
+            mlen = info.mlen
+            meta_scalar_fmt = info.meta_scalar_fmt
 
-            data_bytes = decode.slen * vdim
             data_start = i
             i += data_bytes
 
-            if (
-                decode.dtype == EParseDataType.NUM
-                and not decode.user
-                and decode.dsfmt in self._NUMPY_DTYPE_MAP
-            ):
-                np_dtype = self._NUMPY_DTYPE_MAP[decode.dsfmt]
+            if info.numeric_fast:
+                assert info.np_dtype is not None
                 sample = np.frombuffer(
-                    frame_data, dtype=np_dtype, count=vdim, offset=data_start
+                    frame_data,
+                    dtype=info.np_dtype,
+                    count=info.vdim,
+                    offset=data_start,
                 )
-                if decode.scale and decode.scale != 1:
-                    data_out[chanid][row, :] = sample / decode.scale
+                if info.needs_scale:
+                    darray[row, :] = sample / info.scale
                 else:
-                    data_out[chanid][row, :] = sample
+                    darray[row, :] = sample
             else:
-                sfmt = "<"
-                if vdim and not decode.user:
-                    sfmt += str(vdim)
-                sfmt += decode.dsfmt
-                unpacked = struct.unpack_from(sfmt, frame_data, data_start)
-                formatted = self._stream_data_get(decode, unpacked)
-                data_out[chanid][row, :] = np.asarray(
-                    formatted, dtype=np.object_
+                unpacked = struct.unpack_from(
+                    info.fallback_fmt, frame_data, data_start
                 )
+                formatted = self._stream_data_get(info.decode, unpacked)
+                darray[row, :] = formatted
 
             marray = meta_out[chanid]
             if marray is not None:
-                if mlen in self._META_SCALAR_NUMPY_DTYPE:
-                    meta_fmt = self._META_SCALAR_STRUCT_FMT[mlen]
+                if meta_scalar_fmt is not None:
                     marray[row, 0] = struct.unpack_from(
-                        meta_fmt, frame_data, i
+                        meta_scalar_fmt, frame_data, i
                     )[0]
                 else:
                     marray[row, :] = np.frombuffer(
@@ -378,21 +391,76 @@ class Parser(ICommParse):
         for chanid in active_chanids:
             info = chan_info[chanid]
             assert info is not None
-            decode, vdim, mlen = info
-            chan = dev.channel_get(chanid)
-            assert chan
+            darray = data_out[chanid]
+            assert darray is not None
             blocks.append(
                 DParseStreamBlock(
-                    chan=chan.data.chan,
-                    dtype=int(decode.dtype),
-                    vdim=vdim,
-                    mlen=mlen,
-                    data=data_out[chanid],
+                    chan=info.chan,
+                    dtype=int(info.decode.dtype),
+                    vdim=info.vdim,
+                    mlen=info.mlen,
+                    data=darray,
                     meta=meta_out[chanid],
                 )
             )
 
         return DParseStreamNumpy(flags=frame.data[0], blocks=blocks)
+
+    def _numpy_chan_decode_get(self, chan: DeviceChannel) -> _NumpyChanDecode:
+        """Get or refresh cached decode descriptor for a channel."""
+        chan_data = chan.data
+        chanid = chan_data.chan
+        fingerprint = (chan_data.dtype, chan_data.vdim, chan_data.mlen)
+
+        cached = self._numpy_chan_decode_cache[chanid]
+        if cached is not None and cached.fingerprint == fingerprint:
+            return cached
+
+        decode = dsfmt_get(chan_data.dtype, self._user_types)
+        vdim = chan_data.vdim
+        mlen = chan_data.mlen
+
+        fallback_fmt = "<"
+        if vdim and not decode.user:
+            fallback_fmt += str(vdim)
+        fallback_fmt += decode.dsfmt
+
+        numeric_fast = (
+            decode.dtype == EParseDataType.NUM
+            and not decode.user
+            and decode.dsfmt in self._NUMPY_DTYPE_MAP
+        )
+        np_dtype: np.dtype[Any] | None = None
+        needs_scale = False
+        scale = 1.0
+        out_dtype: np.dtype[Any] = np.dtype(np.object_)
+        if numeric_fast:
+            np_dtype = self._NUMPY_DTYPE_MAP[decode.dsfmt]
+            scale = float(decode.scale) if decode.scale else 1.0
+            needs_scale = scale != 1.0
+            if needs_scale:
+                out_dtype = np.dtype(np.float64)
+            else:
+                out_dtype = np_dtype
+
+        desc = _NumpyChanDecode(
+            fingerprint=fingerprint,
+            chan=chanid,
+            decode=decode,
+            vdim=vdim,
+            mlen=mlen,
+            data_bytes=decode.slen * vdim,
+            packet_bytes=(decode.slen * vdim) + mlen,
+            fallback_fmt=fallback_fmt,
+            numeric_fast=numeric_fast,
+            np_dtype=np_dtype,
+            needs_scale=needs_scale,
+            scale=scale,
+            out_dtype=out_dtype,
+            meta_scalar_fmt=self._META_SCALAR_STRUCT_FMT.get(mlen),
+        )
+        self._numpy_chan_decode_cache[chanid] = desc
+        return desc
 
     def frame_cmninfo_decode(self, frame: DParseFrame) -> ParseCmninfo | None:
         """Decode a cmninfo frame."""
