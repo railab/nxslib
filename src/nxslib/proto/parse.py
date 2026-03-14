@@ -43,6 +43,18 @@ class Parser(ICommParse):
         "f": np.dtype("<f4"),
         "d": np.dtype("<f8"),
     }
+    _META_SCALAR_NUMPY_DTYPE: dict[int, np.dtype[Any]] = {
+        1: np.dtype(np.uint8),
+        2: np.dtype(np.uint16),
+        4: np.dtype(np.uint32),
+        8: np.dtype(np.uint64),
+    }
+    _META_SCALAR_STRUCT_FMT: dict[int, str] = {
+        1: "<B",
+        2: "<H",
+        4: "<I",
+        8: "<Q",
+    }
 
     def __init__(
         self,
@@ -252,8 +264,10 @@ class Parser(ICommParse):
             return None
 
         data_mv = memoryview(frame.data)
-        chan_count: dict[int, int] = {}
-        chan_info: dict[int, tuple[DsfmtItem, int, int]] = {}
+        frame_data = frame.data
+        chan_counts = [0] * 256
+        chan_info: list[tuple[DsfmtItem, int, int] | None] = [None] * 256
+        active_chanids: list[int] = []
 
         # Pass 1: count samples per channel.
         i = 1
@@ -263,20 +277,26 @@ class Parser(ICommParse):
             assert chan
             i += 1
 
-            if chanid not in chan_info:
+            info = chan_info[chanid]
+            if info is None:
                 decode = dsfmt_get(chan.data.dtype, self._user_types)
-                chan_info[chanid] = (decode, chan.data.vdim, chan.data.mlen)
-            decode, vdim, mlen = chan_info[chanid]
+                info = (decode, chan.data.vdim, chan.data.mlen)
+                chan_info[chanid] = info
+                active_chanids.append(chanid)
+            decode, vdim, mlen = info
 
             i += decode.slen * vdim + mlen
-            chan_count[chanid] = chan_count.get(chanid, 0) + 1
+            chan_counts[chanid] += 1
 
         # Allocate output blocks per channel.
         data_out: dict[int, np.ndarray[Any, Any]] = {}
         meta_out: dict[int, np.ndarray[Any, Any] | None] = {}
-        write_idx: dict[int, int] = {}
-        for chanid, nsamples in chan_count.items():
-            decode, vdim, mlen = chan_info[chanid]
+        write_idx = [0] * 256
+        for chanid in active_chanids:
+            nsamples = chan_counts[chanid]
+            info = chan_info[chanid]
+            assert info is not None
+            decode, vdim, mlen = info
             if (
                 decode.dtype == EParseDataType.NUM
                 and not decode.user
@@ -291,30 +311,26 @@ class Parser(ICommParse):
 
             if mlen == 0:
                 meta_out[chanid] = None
-            elif mlen in (1, 2, 4, 8):
-                mdtype = {
-                    1: np.uint8,
-                    2: np.uint16,
-                    4: np.uint32,
-                    8: np.uint64,
-                }
-                meta_out[chanid] = np.empty((nsamples, 1), dtype=mdtype[mlen])
+            elif mlen in self._META_SCALAR_NUMPY_DTYPE:
+                meta_out[chanid] = np.empty(
+                    (nsamples, 1),
+                    dtype=self._META_SCALAR_NUMPY_DTYPE[mlen],
+                )
             else:
                 meta_out[chanid] = np.empty((nsamples, mlen), dtype=np.uint8)
-
-            write_idx[chanid] = 0
 
         # Pass 2: decode and fill.
         i = 1
         while i < len(data_mv):
             chanid = data_mv[i]
             i += 1
-            decode, vdim, mlen = chan_info[chanid]
+            info = chan_info[chanid]
+            assert info is not None
+            decode, vdim, mlen = info
             row = write_idx[chanid]
 
             data_bytes = decode.slen * vdim
             data_start = i
-            raw_data = data_mv[i : i + data_bytes]
             i += data_bytes
 
             if (
@@ -324,7 +340,7 @@ class Parser(ICommParse):
             ):
                 np_dtype = self._NUMPY_DTYPE_MAP[decode.dsfmt]
                 sample = np.frombuffer(
-                    frame.data, dtype=np_dtype, count=vdim, offset=data_start
+                    frame_data, dtype=np_dtype, count=vdim, offset=data_start
                 )
                 if decode.scale and decode.scale != 1:
                     data_out[chanid][row, :] = sample / decode.scale
@@ -335,7 +351,7 @@ class Parser(ICommParse):
                 if vdim and not decode.user:
                     sfmt += str(vdim)
                 sfmt += decode.dsfmt
-                unpacked = struct.unpack(sfmt, raw_data)
+                unpacked = struct.unpack_from(sfmt, frame_data, data_start)
                 formatted = self._stream_data_get(decode, unpacked)
                 data_out[chanid][row, :] = np.asarray(
                     formatted, dtype=np.object_
@@ -343,34 +359,26 @@ class Parser(ICommParse):
 
             marray = meta_out[chanid]
             if marray is not None:
-                if mlen in (1, 2, 4, 8):
-                    mdtype = {
-                        1: np.uint8,
-                        2: np.uint16,
-                        4: np.uint32,
-                        8: np.uint64,
-                    }
-                    meta_start = i
-                    marray[row, 0] = np.frombuffer(
-                        frame.data,
-                        dtype=mdtype[mlen],
-                        count=1,
-                        offset=meta_start,
+                if mlen in self._META_SCALAR_NUMPY_DTYPE:
+                    meta_fmt = self._META_SCALAR_STRUCT_FMT[mlen]
+                    marray[row, 0] = struct.unpack_from(
+                        meta_fmt, frame_data, i
                     )[0]
                 else:
-                    meta_start = i
                     marray[row, :] = np.frombuffer(
-                        frame.data,
+                        frame_data,
                         dtype=np.uint8,
                         count=mlen,
-                        offset=meta_start,
+                        offset=i,
                     )
             i += mlen
             write_idx[chanid] = row + 1
 
         blocks: list[DParseStreamBlock] = []
-        for chanid in sorted(chan_count.keys()):
-            decode, vdim, mlen = chan_info[chanid]
+        for chanid in active_chanids:
+            info = chan_info[chanid]
+            assert info is not None
+            decode, vdim, mlen = info
             chan = dev.channel_get(chanid)
             assert chan
             blocks.append(
