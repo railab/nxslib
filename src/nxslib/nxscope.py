@@ -291,7 +291,7 @@ class NxscopeHandler:
         samples: list[list[DNxscopeStream]] = [[] for _ in range(chmax)]
 
         sdata = self._comm.stream_data()
-        if not sdata:
+        if not sdata:  # pragma: no cover
             return
         if (
             self._comm.flags_is_overflow(sdata.flags) is True
