@@ -313,6 +313,76 @@ class ChannelFunc15(IDeviceChannelFunc):
         return DDeviceChannelFuncData(data=data)
 
 
+class ChannelFunc16(IDeviceChannelFunc):
+    """Generate a single rising step for trigger tests."""
+
+    _cntr = 0
+    _step_at = 200
+
+    def reset(self) -> None:
+        """Reset handler."""
+        self._cntr = 0
+
+    def get(self, _: int) -> DDeviceChannelFuncData:
+        """Get sample data."""
+        value = 0.0 if self._cntr < self._step_at else 1.0
+        self._cntr += 1
+        return DDeviceChannelFuncData(data=(value,))
+
+
+class ChannelFunc17(IDeviceChannelFunc):
+    """Generate a single falling step for trigger tests."""
+
+    _cntr = 0
+    _step_at = 200
+
+    def reset(self) -> None:
+        """Reset handler."""
+        self._cntr = 0
+
+    def get(self, _: int) -> DDeviceChannelFuncData:
+        """Get sample data."""
+        value = 1.0 if self._cntr < self._step_at else 0.0
+        self._cntr += 1
+        return DDeviceChannelFuncData(data=(value,))
+
+
+class ChannelFunc18(IDeviceChannelFunc):
+    """Generate periodic square pulse train (20%% duty)."""
+
+    _cntr = 0
+    _period = 100
+    _high = 20
+
+    def reset(self) -> None:
+        """Reset handler."""
+        self._cntr = 0
+
+    def get(self, _: int) -> DDeviceChannelFuncData:
+        """Get sample data."""
+        phase = self._cntr % self._period
+        value = 1.0 if phase < self._high else 0.0
+        self._cntr += 1
+        return DDeviceChannelFuncData(data=(value,))
+
+
+class ChannelFunc19(IDeviceChannelFunc):
+    """Generate sparse one-sample pulses for trigger tests."""
+
+    _cntr = 0
+    _period = 250
+
+    def reset(self) -> None:
+        """Reset handler."""
+        self._cntr = 0
+
+    def get(self, _: int) -> DDeviceChannelFuncData:
+        """Get sample data."""
+        value = 1.0 if (self._cntr % self._period) == 0 else 0.0
+        self._cntr += 1
+        return DDeviceChannelFuncData(data=(value,))
+
+
 DUMMY_DEV_CHANNELS = [
     DeviceChannel(
         0,
@@ -434,6 +504,34 @@ DUMMY_DEV_CHANNELS = [
         2,
         "polar_theta_radius",
         func=ChannelFunc15(),
+    ),
+    DeviceChannel(
+        17,
+        EDeviceChannelType.FLOAT.value,
+        1,
+        "step_up_once",
+        func=ChannelFunc16(),
+    ),
+    DeviceChannel(
+        18,
+        EDeviceChannelType.FLOAT.value,
+        1,
+        "step_down_once",
+        func=ChannelFunc17(),
+    ),
+    DeviceChannel(
+        19,
+        EDeviceChannelType.FLOAT.value,
+        1,
+        "pulse_square_20p",
+        func=ChannelFunc18(),
+    ),
+    DeviceChannel(
+        20,
+        EDeviceChannelType.FLOAT.value,
+        1,
+        "pulse_single_sparse",
+        func=ChannelFunc19(),
     ),
 ]
 DUMMY_DEV_CHMAX = len(DUMMY_DEV_CHANNELS)
