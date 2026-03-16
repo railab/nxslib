@@ -1,11 +1,13 @@
+=====
 Usage
 =====
 
 Quick start
------------
+===========
 
 The recommended way to manage resources is with the context manager protocol.
-``NxscopeHandler.__enter__`` calls ``connect()`` and ``__exit__`` calls
+``NxscopeHandler.__enter__`` calls ``connect()`` and
+``NxscopeHandler.__exit__`` calls
 ``disconnect()``, so cleanup is guaranteed even if an exception occurs.
 
 .. code-block:: python
@@ -30,7 +32,7 @@ The recommended way to manage resources is with the context manager protocol.
        nxscope.ch_enable(1)
 
        # configure divider if supported
-       if nxscope.dev.div_supported:
+       if nxscope.dev and nxscope.dev.data.div_supported:
            nxscope.ch_divider(0, 10)
            nxscope.ch_divider(1, 20)
 
@@ -51,7 +53,7 @@ The recommended way to manage resources is with the context manager protocol.
    # nxscope.disconnect() is called automatically on context manager exit
 
 Stream decode mode
-------------------
+==================
 
 ``NxscopeHandler`` now decodes stream frames in NumPy block mode by default.
 This is the recommended mode for performance-sensitive pipelines.
@@ -78,8 +80,19 @@ If you need to manage the connection lifetime manually:
    finally:
        nxscope.disconnect()
 
-Interfaces
-----------
+Communication Interfaces
+========================
+
+All interface classes support the context manager protocol:
+
+.. code-block:: python
+
+   from nxslib.intf.serial import SerialDevice
+   with SerialDevice("/dev/ttyACM0") as intf:
+       ...  # intf.stop() called automatically on exit
+
+Dummy device interface
+~~~~~~~~~~~~~~~~~~~~~~
 
 For a quick start, use the simulated NxScope device built into the library:
 
@@ -89,6 +102,16 @@ For a quick start, use the simulated NxScope device built into the library:
    with DummyDev() as intf:
        ...
 
+By default, the dummy interface implements a set of channels that generate
+various types of data.
+
+You can define your own device, including channel implementation.
+Just use ``DummyDev`` class parameters: ``chmax``, ``flags``, and
+``channels``.
+
+Serial port interface
+~~~~~~~~~~~~~~~~~~~~~
+
 Connect to a real NxScope device over a serial port:
 
 .. code-block:: python
@@ -96,6 +119,28 @@ Connect to a real NxScope device over a serial port:
    from nxslib.intf.serial import SerialDevice
    with SerialDevice("/dev/ttyACM0", baud=100000) as intf:
        ...
+
+If your NxScope device supports DMA RX, you have to align data sending from
+the client interface to the smallest value that will trigger a DMA transfer.
+For this purpose there is an ``intf.write_padding`` property that configures
+data padding for the ``write`` method.
+
+You can use ``socat`` to connect to a simulated NuttX target:
+
+.. code-block:: bash
+
+   SERIAL_HOST={PATH}/ttyNX0
+   SERIAL_NUTTX={PATH}/ttySIM0
+
+   # run socat in background
+   socat PTY,link=$SERIAL_NUTTX PTY,link=$SERIAL_HOST &
+   stty -F $SERIAL_NUTTX raw
+   stty -F $SERIAL_HOST raw
+   stty -F $SERIAL_NUTTX 115200
+   stty -F $SERIAL_HOST 115200
+
+Segger RTT interface
+~~~~~~~~~~~~~~~~~~~~
 
 Connect to a device that supports NxScope over the Segger RTT interface:
 
@@ -105,6 +150,9 @@ Connect to a device that supports NxScope over the Segger RTT interface:
    with RTTDevice("STM32G431CB", buffer_index=1, upsize=2048, interface="swd") as intf:
        ...
 
+UDP interface
+~~~~~~~~~~~~~
+
 Connect to a device that supports NxScope over UDP:
 
 .. code-block:: python
@@ -113,18 +161,23 @@ Connect to a device that supports NxScope over UDP:
    with UdpDevice("192.168.0.10", 50000, local_port=0, timeout=1.0) as intf:
        ...
 
-All interface classes support the context manager protocol:
+Use ``UdpDevice`` when the target exposes NxScope over UDP.
+By default it binds to an ephemeral local port (``local_port=0``) and
+reads with a 1 second timeout.
 
 .. code-block:: python
 
-   with SerialDevice("/dev/ttyACM0") as intf:
-       ...  # intf.stop() called automatically on exit
+   from nxslib.intf.udp import UdpDevice
+
+   with UdpDevice("127.0.0.1", 50000, timeout=0.2) as intf:
+       # pass ``intf`` to NxscopeHandler
+       ...
 
 Communication handler
----------------------
+=====================
 
 User extensions and plugins
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Nxslib supports user-defined NxScope frame IDs (IDs ``>= 8``) for protocol
 extensions.
@@ -230,66 +283,19 @@ The extension broker lives in ``nxslib`` and works with any NxScope transport
 is owned by one ``NxscopeHandler`` instance.
 
 Parser
-^^^^^^
+~~~~~~
 
 For now only standard NxScope frames are supported.
 
-It should be easy to implemented a custom protocol parser by providing
-a class derived from `ICommFrame`:
+It should be easy to implement a custom protocol parser by providing
+a class derived from ``ICommFrame``:
 
 .. code-block:: python
+
+   from nxslib.proto.iframe import ICommFrame
+   from nxslib.proto.parse import Parser
 
    class OurCustomFrame(ICommFrame):
        pass # custom implementation
 
-   frame = OurCustomFrame()
-   parse = Parser(frame=frame)
-
-
-Dummy device interface
-""""""""""""""""""""""
-
-At default, dummy interface implements set of channels that generate various
-types of data.
-
-You can define your own device, including channel implementation.
-Just use `DummyDev` class parameters: `chmax`, `flags` and `channels`.
-
-
-Serial port interface
-"""""""""""""""""""""
-
-If your NxScope device supports DMA RX, you have to align data sending from
-the client interface to the smallest value that will trigger a DMA transfer.
-
-For this purpose there is `intf.write_padding` property that configures data
-padding for the `write` method.
-
-You can use `socat` to connect to a simulated NuttX target:
-
-.. code-block:: bash
-
-   SERIAL_HOST={PATH}/ttyNX0
-   SERIAL_NUTTX={PATH}/ttySIM0
-
-   # run socat in background
-   socat PTY,link=$SERIAL_NUTTX PTY,link=$SERIAL_HOST &
-   stty -F $SERIAL_NUTTX raw
-   stty -F $SERIAL_HOST raw
-   stty -F $SERIAL_NUTTX 115200
-   stty -F $SERIAL_HOST 115200
-
-UDP interface
-"""""""""""""
-
-Use `UdpDevice` when the target exposes NxScope over UDP.
-By default it binds to an ephemeral local port (`local_port=0`) and
-reads with a 1 second timeout.
-
-.. code-block:: python
-
-   from nxslib.intf.udp import UdpDevice
-
-   with UdpDevice("127.0.0.1", 50000, timeout=0.2) as intf:
-       # pass `intf` to NxscopeHandler
-       ...
+   parse = Parser(frame=OurCustomFrame)
