@@ -20,6 +20,10 @@ from nxslib.intf.dummy import (
     ChannelFunc13,
     ChannelFunc14,
     ChannelFunc15,
+    ChannelFunc16,
+    ChannelFunc17,
+    ChannelFunc18,
+    ChannelFunc19,
     DummyDev,
 )
 from nxslib.intf.iintf import ICommInterface
@@ -150,6 +154,30 @@ def test_dummy_channelfunc():  # noqa: C901
     for x in range(1001):
         _ = c.get(x)
 
+    c = ChannelFunc16()
+    c.reset()
+    assert isinstance(c.get(0), DDeviceChannelFuncData)
+    for x in range(1001):
+        _ = c.get(x)
+
+    c = ChannelFunc17()
+    c.reset()
+    assert isinstance(c.get(0), DDeviceChannelFuncData)
+    for x in range(1001):
+        _ = c.get(x)
+
+    c = ChannelFunc18()
+    c.reset()
+    assert isinstance(c.get(0), DDeviceChannelFuncData)
+    for x in range(1001):
+        _ = c.get(x)
+
+    c = ChannelFunc19()
+    c.reset()
+    assert isinstance(c.get(0), DDeviceChannelFuncData)
+    for x in range(1001):
+        _ = c.get(x)
+
 
 def test_dummy_divider_affects_stream_rate():
     channel = DeviceChannel(
@@ -252,3 +280,19 @@ def test_dummy_polar_channel_ranges():
     assert all(len(v) == 2 for v in vals)
     assert all(0.0 <= v[0] <= 2.0 * 3.141592653589793 for v in vals)
     assert all(v[1] > 0.0 for v in vals)
+
+
+def test_dummy_trigger_channels_smoke():
+    c_up = ChannelFunc16()
+    c_down = ChannelFunc17()
+    c_sq = ChannelFunc18()
+    c_sparse = ChannelFunc19()
+    c_up.reset()
+    c_down.reset()
+    c_sq.reset()
+    c_sparse.reset()
+
+    assert isinstance(c_up.get(0), DDeviceChannelFuncData)
+    assert isinstance(c_down.get(0), DDeviceChannelFuncData)
+    assert isinstance(c_sq.get(0), DDeviceChannelFuncData)
+    assert isinstance(c_sparse.get(0), DDeviceChannelFuncData)
