@@ -219,15 +219,15 @@ class ParseRecv(ICommParseRecv):
         flags, chan = self.frame_set_decode(data[:2])
 
         if flags == EParseIdSetFlags.BULK.value:
-            fmt = str(dev.data.chmax) + "b"
+            fmt = str(dev.data.chmax) + "B"
             ret = list(struct.unpack(fmt, data[2 : 2 + dev.data.chmax]))
         elif flags == EParseIdSetFlags.SINGLE.value:
-            fmt = "b"
+            fmt = "B"
             div = struct.unpack(fmt, data[2:3])[0]
             ret = dev.channels_div
             ret[chan] = div
         elif flags == EParseIdSetFlags.ALL.value:
-            fmt = "b"
+            fmt = "B"
             div = struct.unpack(fmt, data[2:3])[0]
             ret = [div for i in range(dev.data.chmax)]
         else:

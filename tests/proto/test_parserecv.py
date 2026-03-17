@@ -163,10 +163,20 @@ def test_nxslibparserecv_decode():
     # valid div frame
     _bytes = parser.frame_div((0, 0), 3)  # single
     assert recv.frame_div_decode(_bytes[frame.hdr_len :], d) == [0, 0, 0]
+    _bytes = parser.frame_div((1, 200), 3)  # single high divider
+    assert recv.frame_div_decode(_bytes[frame.hdr_len :], d) == [0, 200, 0]
     _bytes = parser.frame_div([2, 2, 0], 3)  # bulk
     assert recv.frame_div_decode(_bytes[frame.hdr_len :], d) == [2, 2, 0]
+    _bytes = parser.frame_div([200, 0, 255], 3)  # bulk high dividers
+    assert recv.frame_div_decode(_bytes[frame.hdr_len :], d) == [200, 0, 255]
     _bytes = parser.frame_div([3, 3, 3], 3)  # all
     assert recv.frame_div_decode(_bytes[frame.hdr_len :], d) == [3, 3, 3]
+    _bytes = parser.frame_div([200, 200, 200], 3)  # all high divider
+    assert recv.frame_div_decode(_bytes[frame.hdr_len :], d) == [
+        200,
+        200,
+        200,
+    ]
 
     # invalid set types
     _bytes = bytes([EParseIdSetFlags.INVALID, 0, 0])
