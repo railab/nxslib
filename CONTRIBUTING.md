@@ -2,7 +2,7 @@
 
 ### Recommended tools
 
-We use [tox](https://github.com/tox-dev/tox) to automate tedious developer's tasks, 
+We use [tox](https://github.com/tox-dev/tox) to automate tedious developer tasks,
 thus installing it is highly recommended.
 
 ```
@@ -87,8 +87,8 @@ Flake8 linter is available with:
 tox -e flake8
 ```
 
-CI requres 100% coverage to pass. If some of your changes can't be easy tested, 
-you can exclude code from coverage with `#pragma: no cover` comment.
+CI requires 100% coverage to pass. If some of your changes can't be easily tested,
+you can exclude code from coverage with a `#pragma: no cover` comment.
 To run tests with coverage report run:
 
 ```
@@ -101,7 +101,7 @@ If you don't care about coverage report or want to run tests in parallel, just u
 tox -e test
 ```
 
-Current the pylint report isn't taken into account to pass CI (in the future
+Currently the pylint report isn't taken into account to pass CI (in the future
 it may change), but it's available from tox:
 
 ```
