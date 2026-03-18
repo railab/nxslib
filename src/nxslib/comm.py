@@ -3,6 +3,7 @@
 import copy
 import queue
 from dataclasses import dataclass
+from enum import Enum
 from threading import Lock
 from typing import TYPE_CHECKING, Any, Callable, cast
 
@@ -43,6 +44,13 @@ class DUserFrameListener:
 
     ids: set[int] | None
     callback: Callable[[DParseFrame], bool | None]
+
+
+class AckMode(Enum):
+    """ACK behavior for user-frame send operations."""
+
+    ENABLED = "enabled"
+    DISABLED = "disabled"
 
 
 ###############################################################################
@@ -595,33 +603,30 @@ class CommHandler:
         self,
         fid: int,
         payload: bytes,
-        ack_mode: str = "auto",
+        ack_mode: AckMode = AckMode.DISABLED,
         ack_timeout: float = 1.0,
     ) -> ParseAck:
         """Send user-defined frame with configurable ACK handling.
 
         :param fid: user-defined frame ID in [EParseId.INVALID, 255]
         :param payload: raw payload bytes
-        :param ack_mode: auto, required, or disabled
+        :param ack_mode: AckMode.ENABLED or AckMode.DISABLED
         :param ack_timeout: ACK wait timeout in seconds
         """
         if fid < int(EParseId.INVALID) or fid > 0xFF:
             raise ValueError("fid must be in user frame ID range")
 
-        if ack_mode not in {"auto", "required", "disabled"}:
-            raise ValueError("ack_mode must be auto, required or disabled")
+        if not isinstance(ack_mode, AckMode):
+            raise TypeError("ack_mode must be AckMode")
 
         with self._request_lock:
             frame = self._parse.frame.frame_create(fid, payload)
             self._intf.write(frame)
 
-            if ack_mode == "disabled":
+            if ack_mode is AckMode.DISABLED:
                 return ParseAck(True, 0)
 
-            if ack_mode == "required":
-                return self._get_ack_required(timeout=ack_timeout)
-
-            return self._get_ack(timeout=ack_timeout)
+            return self._get_ack_required(timeout=ack_timeout)
 
     def stream_data(self) -> DParseStream | None:
         """Get stream data."""

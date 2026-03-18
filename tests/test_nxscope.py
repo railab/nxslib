@@ -5,6 +5,7 @@ import time
 import numpy as np
 import pytest  # type: ignore
 
+from nxslib.comm import AckMode
 from nxslib.intf.dummy import DummyDev
 from nxslib.nxscope import (
     DExtCallError,
@@ -840,14 +841,16 @@ def test_nxscope_plugin_lifecycle_and_user_api():
     calls = []
 
     def fake_send(
-        fid, payload, ack_mode="auto", ack_timeout=1.0
+        fid, payload, ack_mode=AckMode.DISABLED, ack_timeout=1.0
     ):  # pragma: no cover
         calls.append((fid, payload, ack_mode, ack_timeout))
         return None
 
     nxscope._comm.send_user_frame = fake_send  # type: ignore[attr-defined]
-    nxscope.send_user_frame(8, b"\x11\x22", ack_mode="disabled")
-    assert calls == [(8, b"\x11\x22", "disabled", 1.0)]
+    nxscope.send_user_frame(8, b"\x11\x22", ack_mode=AckMode.DISABLED)
+    assert calls == [(8, b"\x11\x22", AckMode.DISABLED, 1.0)]
+    nxscope.send_user_frame(8, b"\x33\x44", ack_mode=AckMode.ENABLED)
+    assert calls[-1] == (8, b"\x33\x44", AckMode.ENABLED, 1.0)
 
     nxscope.disconnect()
     assert "disconnect" in plugin.events
@@ -1017,7 +1020,9 @@ def test_nxscope_ext_request_response_roundtrip():
         captured = []
         orig_send = nxscope._comm.send_user_frame
 
-        def fake_send(fid, payload, ack_mode="auto", ack_timeout=1.0):
+        def fake_send(
+            fid, payload, ack_mode=AckMode.DISABLED, ack_timeout=1.0
+        ):
             captured.append((fid, payload, ack_mode, ack_timeout))
             req = nxscope._ext_decode(fid, payload)
             assert req is not None
@@ -1041,7 +1046,7 @@ def test_nxscope_ext_request_response_roundtrip():
                 ext_id=3,
                 cmd_id=7,
                 payload=b"ping",
-                ack_mode="disabled",
+                ack_mode=AckMode.DISABLED,
                 timeout=0.2,
             )
         finally:
@@ -1063,18 +1068,24 @@ def test_nxscope_ext_request_timeout():
 
     with nxscope:
         orig_send = nxscope._comm.send_user_frame
-        nxscope._comm.send_user_frame = (
-            lambda fid, payload, ack_mode="auto", ack_timeout=1.0: ParseAck(
-                True, 0
-            )
-        )
+
+        def fake_send_user_frame(
+            fid,
+            payload,
+            ack_mode=AckMode.DISABLED,
+            ack_timeout=1.0,
+        ):
+            del fid, payload, ack_mode, ack_timeout
+            return ParseAck(True, 0)
+
+        nxscope._comm.send_user_frame = fake_send_user_frame
         try:
             with pytest.raises(TimeoutError):
                 nxscope.ext_request(
                     ext_id=9,
                     cmd_id=1,
                     payload=b"\x00",
-                    ack_mode="disabled",
+                    ack_mode=AckMode.DISABLED,
                     timeout=0.01,
                 )
         finally:
@@ -1091,7 +1102,9 @@ def test_nxscope_ext_call_returns_payload():
     with nxscope:
         orig_send = nxscope._comm.send_user_frame
 
-        def fake_send(fid, payload, ack_mode="auto", ack_timeout=1.0):
+        def fake_send(
+            fid, payload, ack_mode=AckMode.DISABLED, ack_timeout=1.0
+        ):
             req = nxscope._ext_decode(fid, payload)
             assert req is not None
             assert req.flags & 0x01
@@ -1114,7 +1127,7 @@ def test_nxscope_ext_call_returns_payload():
                 ext_id=4,
                 cmd_id=1,
                 payload=b"a",
-                ack_mode="disabled",
+                ack_mode=AckMode.DISABLED,
                 timeout=0.2,
             )
         finally:
@@ -1133,7 +1146,9 @@ def test_nxscope_ext_call_decode():
     with nxscope:
         orig_send = nxscope._comm.send_user_frame
 
-        def fake_send(fid, payload, ack_mode="auto", ack_timeout=1.0):
+        def fake_send(
+            fid, payload, ack_mode=AckMode.DISABLED, ack_timeout=1.0
+        ):
             req = nxscope._ext_decode(fid, payload)
             assert req is not None
             assert req.flags & 0x01
@@ -1157,7 +1172,7 @@ def test_nxscope_ext_call_decode():
                 cmd_id=2,
                 payload=b"a",
                 decode=lambda data: int.from_bytes(data, "little"),
-                ack_mode="disabled",
+                ack_mode=AckMode.DISABLED,
                 timeout=0.2,
             )
         finally:
@@ -1176,7 +1191,9 @@ def test_nxscope_ext_call_raises_on_error_status():
     with nxscope:
         orig_send = nxscope._comm.send_user_frame
 
-        def fake_send(fid, payload, ack_mode="auto", ack_timeout=1.0):
+        def fake_send(
+            fid, payload, ack_mode=AckMode.DISABLED, ack_timeout=1.0
+        ):
             req = nxscope._ext_decode(fid, payload)
             assert req is not None
             assert req.flags & 0x01
@@ -1200,7 +1217,7 @@ def test_nxscope_ext_call_raises_on_error_status():
                     ext_id=4,
                     cmd_id=3,
                     payload=b"a",
-                    ack_mode="disabled",
+                    ack_mode=AckMode.DISABLED,
                     timeout=0.2,
                 )
         finally:
@@ -1223,7 +1240,9 @@ def test_nxscope_ext_bind_handles_request_and_notify():
         sent = []
         orig_send = nxscope._comm.send_user_frame
 
-        def fake_send(fid, payload, ack_mode="auto", ack_timeout=1.0):
+        def fake_send(
+            fid, payload, ack_mode=AckMode.DISABLED, ack_timeout=1.0
+        ):
             sent.append((fid, payload, ack_mode, ack_timeout))
             return ParseAck(True, 0)
 
@@ -1444,18 +1463,24 @@ def test_nxscope_extension_dispatch_misc_branches():
         sent = []
         orig_send = nxscope._comm.send_user_frame
 
-        def fake_send(fid, payload, ack_mode="auto", ack_timeout=1.0):
+        def fake_send(
+            fid, payload, ack_mode=AckMode.DISABLED, ack_timeout=1.0
+        ):
             sent.append((fid, payload, ack_mode, ack_timeout))
             return ParseAck(True, 0)
 
         nxscope._comm.send_user_frame = fake_send
         try:
-            assert nxscope.ext_notify(5, 1, b"x", ack_mode="disabled").state
+            assert nxscope.ext_notify(
+                5, 1, b"x", ack_mode=AckMode.DISABLED
+            ).state
             req = nxscope._ext_decode(sent[-1][0], sent[-1][1])
             assert req is not None
             assert req.flags == 0x08
 
-            def fail_ack(fid, payload, ack_mode="auto", ack_timeout=1.0):
+            def fail_ack(
+                fid, payload, ack_mode=AckMode.DISABLED, ack_timeout=1.0
+            ):
                 del fid, payload, ack_mode, ack_timeout
                 return ParseAck(False, -5)
 
@@ -1465,7 +1490,7 @@ def test_nxscope_extension_dispatch_misc_branches():
                     ext_id=5,
                     cmd_id=1,
                     payload=b"x",
-                    ack_mode="required",
+                    ack_mode=AckMode.ENABLED,
                 )
         finally:
             nxscope._comm.send_user_frame = orig_send
@@ -1493,7 +1518,9 @@ def test_nxscope_extension_dispatch_misc_branches():
 
         sent2 = []
 
-        def collect_send(fid, payload, ack_mode="auto", ack_timeout=1.0):
+        def collect_send(
+            fid, payload, ack_mode=AckMode.DISABLED, ack_timeout=1.0
+        ):
             sent2.append((fid, payload, ack_mode, ack_timeout))
             return ParseAck(True, 0)
 
