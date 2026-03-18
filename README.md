@@ -16,7 +16,7 @@ connecting a real NuttX device
 * user-specific stream data decoding (user-defined types)
 * support for custom protocols
 
-## Instalation
+## Installation
 
 Nxslib can be installed by running `pip install nxslib`.
 

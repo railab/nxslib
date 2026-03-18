@@ -12,22 +12,22 @@
 
 ## 1.0.0 (18/03/2026)
 
-- breacking release!
+- breaking release!
 - small improvements for RTT interface
 - add interfaces to get nxscope state:
   * enabled channels
-  * channels div
+  * channel dividers
   * stream bitrate
   * stream status
-  * stream capabilites
-- fix busy loop for serial that cause 100% CPU usage on host simulator
+  * stream capabilities
+- fix busy loop for serial that causes 100% CPU usage on host simulator
 - support divider for dummy dev
 - various small fixes and improvements
-- use contex manager to handle objects cleanup
+- use context manager to handle objects cleanup
 - support for UDP transport
-- support for stream data as numpy data to improve performances
+- support for stream data as numpy data to improve performance
 - make NumPy stream decode mode the default in `NxscopeHandler` and
   deprecate legacy per-sample stream decode mode
-- add support for user defined protocol extentions
+- add support for user defined protocol extensions
 - improve parse/decoding logic
 - add more channels to dummy dev
