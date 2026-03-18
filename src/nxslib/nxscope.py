@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Callable, TypeVar
 
 import numpy as np
 
-from nxslib.comm import CommHandler
+from nxslib.comm import AckMode, CommHandler
 from nxslib.logger import logger
 from nxslib.proto.iparse import ParseAck, dsfmt_get
 from nxslib.thread import ThreadCommon
@@ -217,7 +217,7 @@ class _PluginControl:
         self,
         fid: int,
         payload: bytes,
-        ack_mode: str = "auto",
+        ack_mode: AckMode = AckMode.DISABLED,
         ack_timeout: float = 1.0,
     ) -> ParseAck:
         return self._handler.send_user_frame(
@@ -266,7 +266,7 @@ class _PluginControl:
         cmd_id: int,
         payload: bytes,
         fid: int = 8,
-        ack_mode: str = "auto",
+        ack_mode: AckMode = AckMode.DISABLED,
         ack_timeout: float = 1.0,
     ) -> ParseAck:
         return self._handler.ext_notify(
@@ -285,7 +285,7 @@ class _PluginControl:
         payload: bytes,
         fid: int = 8,
         timeout: float = 1.0,
-        ack_mode: str = "auto",
+        ack_mode: AckMode = AckMode.DISABLED,
         ack_timeout: float = 1.0,
     ) -> DExtResponse:
         return self._handler.ext_request(
@@ -305,7 +305,7 @@ class _PluginControl:
         payload: bytes,
         fid: int = 8,
         timeout: float = 1.0,
-        ack_mode: str = "auto",
+        ack_mode: AckMode = AckMode.DISABLED,
         ack_timeout: float = 1.0,
     ) -> bytes:
         return self._handler.ext_call(
@@ -326,7 +326,7 @@ class _PluginControl:
         decode: Callable[[bytes], T],
         fid: int = 8,
         timeout: float = 1.0,
-        ack_mode: str = "auto",
+        ack_mode: AckMode = AckMode.DISABLED,
         ack_timeout: float = 1.0,
     ) -> T:
         return self._handler.ext_call_decode(
@@ -652,7 +652,7 @@ class NxscopeHandler:
         self,
         fid: int,
         payload: bytes,
-        ack_mode: str = "auto",
+        ack_mode: AckMode = AckMode.DISABLED,
         ack_timeout: float = 1.0,
     ) -> ParseAck:
         """Send user-defined frame through nxscope transport."""
@@ -768,7 +768,7 @@ class NxscopeHandler:
         cmd_id: int,
         payload: bytes,
         fid: int = 8,
-        ack_mode: str = "auto",
+        ack_mode: AckMode = AckMode.DISABLED,
         ack_timeout: float = 1.0,
     ) -> ParseAck:
         """Send extension notification."""
@@ -794,7 +794,7 @@ class NxscopeHandler:
         payload: bytes,
         fid: int = 8,
         timeout: float = 1.0,
-        ack_mode: str = "auto",
+        ack_mode: AckMode = AckMode.DISABLED,
         ack_timeout: float = 1.0,
     ) -> DExtResponse:
         """Send extension request and wait for response."""
@@ -819,7 +819,7 @@ class NxscopeHandler:
                 ack_mode=ack_mode,
                 ack_timeout=ack_timeout,
             )
-            if ack_mode == "required" and not ack.state:
+            if ack_mode is AckMode.ENABLED and not ack.state:
                 raise RuntimeError(
                     f"extension request ACK failed: {ack.retcode}"
                 )
@@ -839,7 +839,7 @@ class NxscopeHandler:
         payload: bytes,
         fid: int = 8,
         timeout: float = 1.0,
-        ack_mode: str = "auto",
+        ack_mode: AckMode = AckMode.DISABLED,
         ack_timeout: float = 1.0,
     ) -> bytes:
         """Send extension request and return payload on success.
@@ -868,7 +868,7 @@ class NxscopeHandler:
         decode: Callable[[bytes], T],
         fid: int = 8,
         timeout: float = 1.0,
-        ack_mode: str = "auto",
+        ack_mode: AckMode = AckMode.DISABLED,
         ack_timeout: float = 1.0,
     ) -> T:
         """Send extension request and decode successful response payload."""
@@ -943,7 +943,7 @@ class NxscopeHandler:
         self.send_user_frame(
             fid=req.fid,
             payload=resp_data,
-            ack_mode="disabled",
+            ack_mode=AckMode.DISABLED,
             ack_timeout=0.0,
         )
         return True

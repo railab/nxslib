@@ -1,6 +1,6 @@
 import pytest  # type: ignore
 
-from nxslib.comm import CommHandler
+from nxslib.comm import AckMode, CommHandler
 from nxslib.dev import Device, EDeviceFlags
 from nxslib.intf.dummy import DummyDev
 from nxslib.proto.iframe import DParseFrame
@@ -449,34 +449,21 @@ def test_send_user_frame_ack_modes():
         # Avoid sending unknown user frames into dummy parser thread.
         comm._intf.write = lambda _data: None
 
-        calls = []
         calls_required = []
-
-        def fake_ack(timeout=1.0):
-            calls.append(timeout)
-            return ParseAck(True, 77)
 
         def fake_ack_req(timeout=1.0):
             calls_required.append(timeout)
             return ParseAck(True, 88)
 
-        comm._get_ack = fake_ack
         comm._get_ack_required = fake_ack_req
 
-        ack = comm.send_user_frame(8, b"\xaa", ack_mode="disabled")
+        ack = comm.send_user_frame(8, b"\xaa", ack_mode=AckMode.DISABLED)
         assert ack.state is True
         assert ack.retcode == 0
-        assert calls == []
         assert calls_required == []
 
         ack = comm.send_user_frame(
-            9, b"\xbb", ack_mode="auto", ack_timeout=0.2
-        )
-        assert ack.retcode == 77
-        assert calls == [0.2]
-
-        ack = comm.send_user_frame(
-            10, b"\xcc", ack_mode="required", ack_timeout=0.3
+            10, b"\xcc", ack_mode=AckMode.ENABLED, ack_timeout=0.3
         )
         assert ack.retcode == 88
         assert calls_required == [0.3]
@@ -485,8 +472,31 @@ def test_send_user_frame_ack_modes():
             comm.send_user_frame(7, b"\x00")
         with pytest.raises(ValueError):
             comm.send_user_frame(256, b"\x00")
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             comm.send_user_frame(8, b"\x00", ack_mode="bad")
+
+
+def test_send_user_frame_ack_modes_enum():
+    i = DummyDev(thread_timeout=0.05)
+    p = Parser()
+    with CommHandler(
+        i, p, drop_timeout=0.01, stream_data_timeout=0.05
+    ) as comm:
+        comm._intf.write = lambda _data: None
+        comm._get_ack_required = lambda timeout=1.0: ParseAck(
+            True, int(timeout * 1000)
+        )
+
+        assert (
+            comm.send_user_frame(8, b"\xaa", ack_mode=AckMode.DISABLED).retcode
+            == 0
+        )
+        assert (
+            comm.send_user_frame(
+                8, b"\xcc", ack_mode=AckMode.ENABLED, ack_timeout=0.3
+            ).retcode
+            == 300
+        )
 
 
 def test_recv_thread_dispatches_user_frames():

@@ -2,6 +2,8 @@
 
 from typing import TYPE_CHECKING, Any, Callable, Protocol, TypeVar
 
+from nxslib.comm import AckMode
+
 if TYPE_CHECKING:
     from nxslib.dev import Device
     from nxslib.nxscope import (
@@ -22,7 +24,7 @@ class INxscopeControl(Protocol):
         self,
         fid: int,
         payload: bytes,
-        ack_mode: str = "auto",
+        ack_mode: AckMode = AckMode.DISABLED,
         ack_timeout: float = 1.0,
     ) -> "ParseAck":
         """Send a user-defined frame."""
@@ -66,7 +68,7 @@ class INxscopeControl(Protocol):
         cmd_id: int,
         payload: bytes,
         fid: int = 8,
-        ack_mode: str = "auto",
+        ack_mode: AckMode = AckMode.DISABLED,
         ack_timeout: float = 1.0,
     ) -> "ParseAck":
         """Send extension notification."""
@@ -78,7 +80,7 @@ class INxscopeControl(Protocol):
         payload: bytes,
         fid: int = 8,
         timeout: float = 1.0,
-        ack_mode: str = "auto",
+        ack_mode: AckMode = AckMode.DISABLED,
         ack_timeout: float = 1.0,
     ) -> "DExtResponse":
         """Send extension request and wait for response."""
@@ -90,7 +92,7 @@ class INxscopeControl(Protocol):
         payload: bytes,
         fid: int = 8,
         timeout: float = 1.0,
-        ack_mode: str = "auto",
+        ack_mode: AckMode = AckMode.DISABLED,
         ack_timeout: float = 1.0,
     ) -> bytes:
         """Send request and return payload or raise on extension errors."""
@@ -103,7 +105,7 @@ class INxscopeControl(Protocol):
         decode: Callable[[bytes], T],
         fid: int = 8,
         timeout: float = 1.0,
-        ack_mode: str = "auto",
+        ack_mode: AckMode = AckMode.DISABLED,
         ack_timeout: float = 1.0,
     ) -> T:
         """Send request, then decode the successful response payload."""
