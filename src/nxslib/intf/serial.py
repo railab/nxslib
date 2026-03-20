@@ -64,6 +64,7 @@ class SerialDevice(ICommInterface):
         logger.debug("Stop serial interface")
         if self._ser:
             self._ser.close()
+            self._ser = None
 
     def drop_all(self) -> None:
         """Drop all frames."""
@@ -75,14 +76,17 @@ class SerialDevice(ICommInterface):
 
     def _read(self) -> bytes:
         """Interface specific read method."""
-        assert self._ser
+        if self._ser is None:
+            return b""
+        if self._ser.is_open is False:
+            return b""
         try:
             pending = self._ser.in_waiting
             # Avoid busy loop when no data is pending: read(0) returns
             # immediately and can spin a CPU core in the recv thread.
             size = pending if pending > 0 else 1
             return self._ser.read(size)  # type: ignore
-        except serial.SerialException as exc:
+        except (serial.SerialException, TypeError) as exc:
             logger.debug("SerialException ignored: %s", str(exc))
             return b""
 
@@ -91,5 +95,8 @@ class SerialDevice(ICommInterface):
 
         :param data: bytes to send
         """
-        assert self._ser
+        if self._ser is None:
+            return
+        if self._ser.is_open is False:
+            return
         self._ser.write(data)
