@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = "nxslib"
-version = "1.0.0"
+version = "1.0.1"
 authors = [{name = "raiden00", email = "raiden00@railab.me"}]
 description = "NxScope client library"
 license = {text = "Apache-2.0"}
@@ -17,11 +17,13 @@ dependencies = [
          "numpy>=1.20",
 ]
 classifiers = [
-  "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Software Development :: Embedded Systems",
   "Operating System :: OS Independent",
 ]
