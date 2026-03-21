@@ -24,6 +24,11 @@ from nxslib.intf.dummy import (
     ChannelFunc17,
     ChannelFunc18,
     ChannelFunc19,
+    ChannelFunc20,
+    ChannelFunc21,
+    ChannelFunc22,
+    ChannelFunc23,
+    ChannelFunc24,
     DummyDev,
 )
 from nxslib.intf.iintf import ICommInterface
@@ -173,6 +178,36 @@ def test_dummy_channelfunc():  # noqa: C901
         _ = c.get(x)
 
     c = ChannelFunc19()
+    c.reset()
+    assert isinstance(c.get(0), DDeviceChannelFuncData)
+    for x in range(1001):
+        _ = c.get(x)
+
+    c = ChannelFunc20()
+    c.reset()
+    assert isinstance(c.get(0), DDeviceChannelFuncData)
+    for x in range(1001):
+        _ = c.get(x)
+
+    c = ChannelFunc21()
+    c.reset()
+    assert isinstance(c.get(0), DDeviceChannelFuncData)
+    for x in range(1001):
+        _ = c.get(x)
+
+    c = ChannelFunc22()
+    c.reset()
+    assert isinstance(c.get(0), DDeviceChannelFuncData)
+    for x in range(1001):
+        _ = c.get(x)
+
+    c = ChannelFunc23()
+    c.reset()
+    assert isinstance(c.get(0), DDeviceChannelFuncData)
+    for x in range(1001):
+        _ = c.get(x)
+
+    c = ChannelFunc24()
     c.reset()
     assert isinstance(c.get(0), DDeviceChannelFuncData)
     for x in range(1001):

@@ -314,7 +314,7 @@ class ChannelFunc15(IDeviceChannelFunc):
 
 
 class ChannelFunc16(IDeviceChannelFunc):
-    """Generate a single rising step for trigger tests."""
+    """Generate one low-to-high step transition."""
 
     _cntr = 0
     _step_at = 200
@@ -331,7 +331,7 @@ class ChannelFunc16(IDeviceChannelFunc):
 
 
 class ChannelFunc17(IDeviceChannelFunc):
-    """Generate a single falling step for trigger tests."""
+    """Generate one high-to-low step transition."""
 
     _cntr = 0
     _step_at = 200
@@ -348,7 +348,7 @@ class ChannelFunc17(IDeviceChannelFunc):
 
 
 class ChannelFunc18(IDeviceChannelFunc):
-    """Generate periodic square pulse train (20%% duty)."""
+    """Generate a periodic square wave with 20%% duty cycle."""
 
     _cntr = 0
     _period = 100
@@ -367,7 +367,7 @@ class ChannelFunc18(IDeviceChannelFunc):
 
 
 class ChannelFunc19(IDeviceChannelFunc):
-    """Generate sparse one-sample pulses for trigger tests."""
+    """Generate sparse one-sample impulses."""
 
     _cntr = 0
     _period = 250
@@ -381,6 +381,102 @@ class ChannelFunc19(IDeviceChannelFunc):
         value = 1.0 if (self._cntr % self._period) == 0 else 0.0
         self._cntr += 1
         return DDeviceChannelFuncData(data=(value,))
+
+
+class ChannelFunc20(IDeviceChannelFunc):
+    """Generate a periodic square wave with 50%% duty cycle."""
+
+    _cntr = 0
+    _period = 100
+    _high = 50
+
+    def reset(self) -> None:
+        """Reset handler."""
+        self._cntr = 0
+
+    def get(self, _: int) -> DDeviceChannelFuncData:
+        """Get sample data."""
+        phase = self._cntr % self._period
+        value = 1.0 if phase < self._high else 0.0
+        self._cntr += 1
+        return DDeviceChannelFuncData(data=(value,))
+
+
+class ChannelFunc21(IDeviceChannelFunc):
+    """Generate a slow sine wave."""
+
+    _cntr = 0
+    _period = 400
+
+    def reset(self) -> None:
+        """Reset handler."""
+        self._cntr = 0
+
+    def get(self, _: int) -> DDeviceChannelFuncData:
+        """Get sample data."""
+        angle = 2.0 * math.pi * self._cntr / self._period
+        value = math.sin(angle)
+        self._cntr += 1
+        self._cntr %= self._period
+        return DDeviceChannelFuncData(data=(value,))
+
+
+class ChannelFunc22(IDeviceChannelFunc):
+    """Generate clustered impulses in a repeating pattern."""
+
+    _cntr = 0
+    _period = 80
+    _glitches = {0, 3, 6}
+
+    def reset(self) -> None:
+        """Reset handler."""
+        self._cntr = 0
+
+    def get(self, _: int) -> DDeviceChannelFuncData:
+        """Get sample data."""
+        phase = self._cntr % self._period
+        value = 1.0 if phase in self._glitches else 0.0
+        self._cntr += 1
+        return DDeviceChannelFuncData(data=(value,))
+
+
+class ChannelFunc23(IDeviceChannelFunc):
+    """Generate one isolated impulse in a long frame."""
+
+    _cntr = 0
+    _spike_at = 180
+
+    def reset(self) -> None:
+        """Reset handler."""
+        self._cntr = 0
+
+    def get(self, _: int) -> DDeviceChannelFuncData:
+        """Get sample data."""
+        if self._cntr == self._spike_at:
+            value = 4.0
+        else:
+            value = 0.0
+        self._cntr += 1
+        return DDeviceChannelFuncData(data=(value,))
+
+
+class ChannelFunc24(IDeviceChannelFunc):
+    """Generate a mixed 3D vector signal with one stepped axis."""
+
+    _cntr = 0
+    _step_at = 150
+
+    def reset(self) -> None:
+        """Reset handler."""
+        self._cntr = 0
+
+    def get(self, _: int) -> DDeviceChannelFuncData:
+        """Get sample data."""
+        value0 = -1.0 if (self._cntr % 40) < 20 else 1.0
+        value1 = 0.0 if self._cntr < self._step_at else 1.0
+        value2 = float(self._cntr % 10) / 10.0
+        self._cntr += 1
+        return DDeviceChannelFuncData(data=(value0, value1, value2))
 
 
 DUMMY_DEV_CHANNELS = [
@@ -509,29 +605,64 @@ DUMMY_DEV_CHANNELS = [
         17,
         EDeviceChannelType.FLOAT.value,
         1,
-        "step_up_once",
+        "step_low_to_high",
         func=ChannelFunc16(),
     ),
     DeviceChannel(
         18,
         EDeviceChannelType.FLOAT.value,
         1,
-        "step_down_once",
+        "step_high_to_low",
         func=ChannelFunc17(),
     ),
     DeviceChannel(
         19,
         EDeviceChannelType.FLOAT.value,
         1,
-        "pulse_square_20p",
+        "square_wave_20p",
         func=ChannelFunc18(),
     ),
     DeviceChannel(
         20,
         EDeviceChannelType.FLOAT.value,
         1,
-        "pulse_single_sparse",
+        "impulse_sparse",
         func=ChannelFunc19(),
+    ),
+    DeviceChannel(
+        21,
+        EDeviceChannelType.FLOAT.value,
+        1,
+        "square_wave_50p",
+        func=ChannelFunc20(),
+    ),
+    DeviceChannel(
+        22,
+        EDeviceChannelType.FLOAT.value,
+        1,
+        "sine_slow",
+        func=ChannelFunc21(),
+    ),
+    DeviceChannel(
+        23,
+        EDeviceChannelType.FLOAT.value,
+        1,
+        "impulse_clustered",
+        func=ChannelFunc22(),
+    ),
+    DeviceChannel(
+        24,
+        EDeviceChannelType.FLOAT.value,
+        1,
+        "impulse_once_ref",
+        func=ChannelFunc23(),
+    ),
+    DeviceChannel(
+        25,
+        EDeviceChannelType.FLOAT.value,
+        3,
+        "vec3_mixed_steps",
+        func=ChannelFunc24(),
     ),
 ]
 DUMMY_DEV_CHMAX = len(DUMMY_DEV_CHANNELS)
