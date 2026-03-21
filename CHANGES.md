@@ -31,3 +31,8 @@
 - add support for user defined protocol extensions
 - improve parse/decoding logic
 - add more channels to dummy dev
+
+## 1.0.1 (21/03/2026)
+
+- fix serial device cleanup
+- add more channels to dummy dev
