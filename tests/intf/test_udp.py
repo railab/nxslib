@@ -47,13 +47,29 @@ def test_nxslibudp_context_manager_and_start():
         srv.close()
 
 
-def test_nxslibudp_drop_all_reads_until_empty():
+def test_nxslibudp_drop_all_drains_nonblocking():
     dev = UdpDevice.__new__(UdpDevice)
-    dev._read = Mock(side_effect=[b"", b"", b"", b""])
+    dev._timeout = 0.1
+    dev._sock = Mock()
+    dev._sock.recv.side_effect = [b"ping", b"pong", BlockingIOError()]
+    dev._sock.fileno.return_value = 3
 
     dev.drop_all()
 
-    assert dev._read.call_count == 4
+    dev._sock.setblocking.assert_called_once_with(False)
+    dev._sock.settimeout.assert_called_once_with(0.1)
+    assert dev._sock.recv.call_count == 3
+
+
+def test_nxslibudp_drop_all_closed_socket_returns():
+    dev = UdpDevice.__new__(UdpDevice)
+    dev._timeout = 0.1
+    dev._sock = Mock()
+    dev._sock.fileno.return_value = -1
+
+    dev.drop_all()
+
+    assert dev._sock is None
 
 
 def test_nxslibudp_read_timeout_returns_empty():
@@ -70,3 +86,27 @@ def test_nxslibudp_read_oserror_returns_empty():
     dev._sock.recv.side_effect = OSError("recv failed")
 
     assert dev._read() == b""
+
+
+def test_nxslibudp_read_closed_socket_returns_empty():
+    dev = UdpDevice.__new__(UdpDevice)
+    dev._sock = None
+
+    assert dev._read() == b""
+
+
+def test_nxslibudp_write_closed_socket_returns():
+    dev = UdpDevice.__new__(UdpDevice)
+    dev._sock = None
+
+    dev._write(b"ping")
+
+
+def test_nxslibudp_stop_closed_socket_returns():
+    dev = UdpDevice.__new__(UdpDevice)
+    dev._sock = Mock()
+    dev._sock.fileno.return_value = -1
+
+    dev.stop()
+
+    assert dev._sock is None
