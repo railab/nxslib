@@ -23,6 +23,8 @@ class UdpDevice(ICommInterface):
         :param local_port: local UDP port (0 = ephemeral)
         :param timeout: socket timeout in seconds
         """
+        self._timeout = timeout
+        self._sock: socket.socket | None
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._sock.settimeout(timeout)
 
@@ -52,18 +54,36 @@ class UdpDevice(ICommInterface):
     def stop(self) -> None:
         """Stop the interface."""
         logger.debug("Stop udp interface")
+        if self._sock is None:
+            return
+        if self._sock.fileno() < 0:
+            self._sock = None
+            return
         self._sock.close()
+        self._sock = None
 
     def drop_all(self) -> None:
         """Drop all frames."""
-        cntr = 4
-        while cntr > 0:
-            ret = self._read()
-            if not ret:  # pragma: no cover
-                cntr -= 1
+        if self._sock is None:  # pragma: no cover
+            return
+        if self._sock.fileno() < 0:
+            self._sock = None
+            return
+
+        self._sock.setblocking(False)
+        try:
+            while True:
+                try:
+                    self._sock.recv(4096)
+                except BlockingIOError:
+                    break
+        finally:
+            self._sock.settimeout(self._timeout)
 
     def _read(self) -> bytes:
         """Interface specific read method."""
+        if self._sock is None:
+            return b""
         try:
             return self._sock.recv(4096)
         except TimeoutError:
@@ -77,4 +97,6 @@ class UdpDevice(ICommInterface):
 
         :param data: bytes to send
         """
+        if self._sock is None:
+            return
         self._sock.send(data)
