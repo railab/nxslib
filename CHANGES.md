@@ -36,3 +36,8 @@
 
 - fix serial device cleanup
 - add more channels to dummy dev
+
+## 1.0.2 (23/03/2026)
+
+- speed up serial dev connection
+- speed up UDP dev connection
